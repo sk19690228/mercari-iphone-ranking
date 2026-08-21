@@ -82,6 +82,7 @@
   .rankingEditHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;}
   .rankingEditHead b{color:var(--accent);font-size:14px;}
   .rankingEditHead .btn-secondary{width:auto;margin:0;padding:7px 12px;font-size:12px;}
+  .rankingCopyStatus{min-height:16px;margin-top:4px;}
   #rankingOutputImg{width:100%;border-radius:16px;margin-top:12px;border:1px solid var(--border);display:none;background:#07111f;}
   #rankingCanvas{display:none;}
 </style>
@@ -95,8 +96,9 @@
 <main>
 
   <div class="card">
-    <h2>① 固定条件で新着商品を自動検索</h2>
+    <h2>新着商品を自動検索</h2>
     <div class="hint">アプリを開くたびに、指定済みのiPhone 16・SIMフリー検索条件で新着商品を取得します。</div>
+    <div class="hint" id="avgPriceUpdatedAt">中古平均価格の更新日時：確認中...</div>
     <details class="settings">
       <summary>自動検索・選定条件</summary>
       <div class="row2">
@@ -118,23 +120,18 @@
     </details>
     <button class="btn-primary" id="bulkSearchBtn">新着商品を再検索・おすすめ決定</button>
     <div class="status" id="bulkStatus"></div>
-    <div class="progressBox" id="bulkProgress" style="display:none"></div>
+    <div class="progressBox" id="bulkProgress" style="display:none" hidden></div>
     <div class="status" id="shareStatus" style="display:none"></div>
   </div>
 
   <div class="card">
-    <h2>② 新着候補を比較</h2>
-    <div id="candidateList"></div>
-  </div>
-
-  <div class="card">
-    <h2>③ 選択商品を確認・修正</h2>
+    <h2>選択商品を確認</h2>
     <div class="hint">割引率が高い上位3件を自動表示します。商品画像は表示しません。</div>
     <div id="rankingEditor" class="rankingEditor"></div>
   </div>
 
   <div class="card">
-    <h2>④ おすすめランキング画像</h2>
+    <h2>おすすめランキング画像</h2>
     <div class="hint">おすすめランキング1～3を、1枚の画像にまとめます。</div>
     <button class="btn-primary" id="downloadRankingBtn" type="button" disabled>ランキング画像をダウンロード</button>
     <img id="rankingOutputImg" alt="おすすめランキング1位から3位をまとめた画像">
@@ -142,9 +139,8 @@
   </div>
 
   <div class="card">
-    <h2>⑤ PR表記・アフィリエイトリンク</h2>
+    <h2>PR表記・アフィリエイトリンク</h2>
     <textarea id="affiliateText" rows="7" style="font-size:14px;"></textarea>
-    <button class="btn-secondary" id="regenAffiliateBtn">テキストを再生成</button>
     <button class="btn-primary" id="copyAffiliateBtn">コピー</button>
     <div class="status" id="copyAffiliateStatus"></div>
   </div>
@@ -159,10 +155,10 @@
     <input id="fAmazonPrice"><input id="amazonAffiliateUrl"><button id="clearAmazonAffiliateBtn"></button>
     <canvas id="chart" width="600" height="360"></canvas><button id="generateBtn"></button><img id="outputImg" alt="">
     <button id="downloadBtn"></button><canvas id="outputCanvas" width="1080" height="1350"></canvas>
+    <div id="candidateList"></div>
   </div>
 
-
-  <div class="card">
+  <div class="card" hidden aria-hidden="true">
     <h2>📊 中古平均価格一覧（iPhone 16シリーズ）</h2>
     <div id="avgPriceRegistryList"></div>
     <div class="status" id="avgPriceStatus"></div>
@@ -426,6 +422,17 @@ function renderAvgPriceRegistryUI(){
 }
 renderAvgPriceRegistryUI();
 
+function setAvgPriceUpdatedAt(value){
+  const date=value?new Date(value):null;
+  if(!date||Number.isNaN(date.getTime())) return;
+  localStorage.setItem('avgPriceUpdatedAt',date.toISOString());
+  $('avgPriceUpdatedAt').textContent='中古平均価格の更新日時：'+new Intl.DateTimeFormat('ja-JP',{
+    year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Tokyo'
+  }).format(date);
+}
+const savedAvgPriceUpdatedAt=localStorage.getItem('avgPriceUpdatedAt');
+if(savedAvgPriceUpdatedAt) setAvgPriceUpdatedAt(savedAvgPriceUpdatedAt);
+
 // 同じ階層にmercari-avg-prices.jsonがあれば、内蔵の参考価格より優先して読み込む
 const sharedAvgPricesPromise=(async function loadSharedAvgPrices(){
   const statusEl=$('avgPriceStatus');
@@ -433,6 +440,7 @@ const sharedAvgPricesPromise=(async function loadSharedAvgPrices(){
     const res = await fetch('./mercari-avg-prices.json', { cache: 'no-store' });
     if(res.ok){
       const shared = await res.json();
+      setAvgPriceUpdatedAt(res.headers.get('last-modified')||new Date().toISOString());
       if(shared && typeof shared === 'object'){
         avgPriceOverrides = { ...shared };
         Object.keys(avgPriceOverrides).forEach(k => {
@@ -468,8 +476,9 @@ async function autoSaveAvgPricesToGas({silent=false}={}){
   statusEl.textContent='中古平均価格をGASへ自動保存中...';statusEl.className='status loading';
   try {
     const cleaned=buildAvgPricePayload();
-    await callMercariRelay('saveAvgPrices', { data: JSON.stringify(cleaned) });
+    const savedResult=await callMercariRelay('saveAvgPrices', { data: JSON.stringify(cleaned) });
     avgPriceOverrides = { ...cleaned };
+    setAvgPriceUpdatedAt(savedResult.updatedAt||new Date().toISOString());
     statusEl.textContent='中古平均価格を自動取得・GASへ保存しました';statusEl.className='status ok';
     return true;
   } catch(e){
@@ -519,6 +528,16 @@ const rankingDrafts = (()=>{
   try{return JSON.parse(localStorage.getItem('mercariRankingDraftsV1')||'{}')||{};}catch(e){return {};}
 })();
 const RANK_MEDALS=['🥇','🥈','🥉'];
+const RANK_NUMBERS=['①','②','③'];
+const MERCARI_AFFILIATE_ID='9289281257';
+function buildMercariAffiliateUrl(pageUrl){
+  try{
+    const url=new URL(String(pageUrl||'').trim());
+    if(url.protocol!=='https:'||url.hostname!=='jp.mercari.com'||!/^\/(?:item|shops\/product)\/[A-Za-z0-9_-]+\/?$/.test(url.pathname)) return '';
+    url.hash='';url.search='';url.searchParams.set('afid',MERCARI_AFFILIATE_ID);
+    return url.toString();
+  }catch(e){return '';}
+}
 function discountSortValue(c){ return c&&c.discountRate!==null&&c.discountRate!==undefined&&Number.isFinite(Number(c.discountRate)) ? Number(c.discountRate) : -Infinity; }
 function getTopRankings(){
   return candidates
@@ -529,10 +548,12 @@ function getTopRankings(){
 }
 function rankingDraft(c){
   const saved=rankingDrafts[c.url]||{};
+  const pageUrl=saved.pageUrl!==undefined?saved.pageUrl:(c.url||'');
+  const hasAffiliate=Object.prototype.hasOwnProperty.call(saved,'affiliateUrl');
   return {
     title:saved.title!==undefined?saved.title:(c.title||''),
-    pageUrl:saved.pageUrl!==undefined?saved.pageUrl:(c.url||''),
-    affiliateUrl:saved.affiliateUrl||''
+    pageUrl,
+    affiliateUrl:hasAffiliate?saved.affiliateUrl:buildMercariAffiliateUrl(pageUrl)
   };
 }
 function saveRankingDraft(url,field,value){
@@ -541,8 +562,8 @@ function saveRankingDraft(url,field,value){
 }
 function rankingPriceLine(c,draft){
   const normalized=[c.model,c.storage].filter(Boolean).join(' / ');
-  const title=(draft.title||normalized||'商品タイトル未設定').trim();
-  return `${title}　${c.price?yen(c.price):'価格不明'}`;
+  const title=(draft.title||normalized||'商品タイトル未設定').trim().replace(/\s*(?:by\s+メルカリ|[-｜|]\s*メルカリ)\s*$/i,'');
+  return `${title} by メルカリ　${c.price?yen(c.price):'価格不明'}`;
 }
 function rankingDiscountLine(c){
   if(!c.avgPrice||c.discountRate==null) return '中古平均価格 データなし / 比較不能';
@@ -555,12 +576,11 @@ function buildAffiliateText(){
   const blocks=ranked.map((c,i)=>{
     const draft=rankingDraft(c);
     const affiliate=draft.affiliateUrl.trim()||'(メルカリアフィリエイトリンク未入力)';
-    return `🉐おすすめランキング${RANK_MEDALS[i]}\n${rankingPriceLine(c,draft)}\n${rankingDiscountLine(c)}\n商品はこちら👉  ${affiliate}`;
+    return `🉐おすすめランキング${RANK_NUMBERS[i]}${RANK_MEDALS[i]}\n${rankingPriceLine(c,draft)}\n${rankingDiscountLine(c)}\n商品はこちら👉  ${affiliate}`;
   });
   return `✨メルカリ✨型落ちiPhone🤓👍\n${blocks.length?'\n'+blocks.join('\n\n')+'\n':''}[PR] mercari ambassador`;
 }
 function regenerateAffiliateText(){ $('affiliateText').value = buildAffiliateText(); }
-$('regenAffiliateBtn').addEventListener('click', regenerateAffiliateText);
 function saveAffiliateLinks(){
   localStorage.setItem('mercariAffiliateUrl', $('mercariAffiliateUrl').value.trim());
   localStorage.setItem('amazonAffiliateUrl', $('amazonAffiliateUrl').value.trim());
@@ -580,21 +600,18 @@ regenerateAffiliateText();
 async function copyTextToClipboard(text, statusId){
   const statusEl = $(statusId);
   try {
-    if(navigator.clipboard && navigator.clipboard.writeText){
-      await navigator.clipboard.writeText(text);
-    } else {
-      const ta = document.createElement('textarea');
-      ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
-      document.body.appendChild(ta); ta.focus(); ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-    }
+    await writeClipboardText(text);
     statusEl.textContent = 'コピーしました';
     statusEl.className = 'status ok';
   } catch(e){
     statusEl.textContent = 'コピーに失敗しました。テキストを選択して手動でコピーしてください';
     statusEl.className = 'status err';
   }
+}
+async function writeClipboardText(text){
+  if(navigator.clipboard && navigator.clipboard.writeText){await navigator.clipboard.writeText(text);return;}
+  const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.focus();ta.select();document.execCommand('copy');document.body.removeChild(ta);
 }
 function copyTextFrom(textareaId, statusId){
   return copyTextToClipboard($(textareaId).value, statusId);
@@ -972,7 +989,7 @@ function validateMercariRelaySettings(cfg){
 async function callMercariRelayFetch(action,params,cfg){
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),mercariRelayTimeout(action));
-  const qs=new URLSearchParams({action,token:cfg.token,client_version:'ranking-1',_ts:String(Date.now()),...params});
+  const qs=new URLSearchParams({action,token:cfg.token,client_version:'ranking-2',_ts:String(Date.now()),...params});
   try{
     const response=await fetch(cfg.url+'?'+qs.toString(),{
       method:'GET',mode:'cors',cache:'no-store',credentials:'omit',redirect:'follow',
@@ -987,7 +1004,7 @@ async function callMercariRelayFetch(action,params,cfg){
 function callMercariRelayJsonp(action,params,cfg){
   return new Promise((resolve,reject)=>{
     const callback='__mercariRelay_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-    const qs=new URLSearchParams({action,token:cfg.token,callback,client_version:'ranking-1',_ts:String(Date.now()),...params});
+    const qs=new URLSearchParams({action,token:cfg.token,callback,client_version:'ranking-2',_ts:String(Date.now()),...params});
     const script=document.createElement('script');
     script.async=true;
     script.referrerPolicy='no-referrer';
@@ -1034,6 +1051,7 @@ async function loadAppConfigFromGas({silent=false}={}){
       renderAvgPriceRegistryUI();
       updateAvgPriceDisplay();
     }
+    if(r.updatedAt) setAvgPriceUpdatedAt(r.updatedAt);
     return true;
   }catch(e){
     if(!silent) throw e;
@@ -1221,14 +1239,26 @@ function renderRankingEditor(){
     return `<section class="rankingEditCard" data-ranking-url="${esc(c.url)}">
       <div class="rankingEditHead"><b>おすすめランキング${i+1} ${RANK_MEDALS[i]}</b></div>
       <label>商品タイトル</label><input type="text" data-ranking-field="title" value="${esc(draft.title)}">
-      <label>メルカリ商品ページのリンク</label><input type="url" data-ranking-field="pageUrl" value="${esc(draft.pageUrl)}">
+      <label>メルカリ商品ページのリンク</label><div class="fieldAction"><input type="url" data-ranking-field="pageUrl" value="${esc(draft.pageUrl)}"><button class="btn-secondary rankingCopyPageBtn" type="button">コピー</button></div><div class="hint rankingCopyStatus"></div>
       <label>メルカリアフィリエイトリンク貼り付け欄</label><div class="fieldAction"><input type="url" data-ranking-field="affiliateUrl" value="${esc(draft.affiliateUrl)}" placeholder="https://jp.mercari.com/item/...?afid=..."><button class="btn-secondary rankingClearBtn" type="button">クリア</button></div>
     </section>`;
   }).join('');
   editor.querySelectorAll('[data-ranking-field]').forEach(input=>input.addEventListener('input',()=>{
     const card=input.closest('[data-ranking-url]');
     saveRankingDraft(card.dataset.rankingUrl,input.dataset.rankingField,input.value);
+    if(input.dataset.rankingField==='pageUrl'){
+      const affiliate=card.querySelector('[data-ranking-field="affiliateUrl"]');
+      if(!affiliate.value.trim()){
+        const generated=buildMercariAffiliateUrl(input.value);
+        if(generated){affiliate.value=generated;saveRankingDraft(card.dataset.rankingUrl,'affiliateUrl',generated);}
+      }
+    }
     regenerateAffiliateText();renderRankingImage();
+  }));
+  editor.querySelectorAll('.rankingCopyPageBtn').forEach(btn=>btn.addEventListener('click',async()=>{
+    const card=btn.closest('[data-ranking-url]'),pageUrl=card.querySelector('[data-ranking-field="pageUrl"]').value.trim(),status=card.querySelector('.rankingCopyStatus');
+    try{await writeClipboardText(pageUrl);status.textContent='商品ページのリンクをコピーしました';status.style.color='var(--good)';}
+    catch(e){status.textContent='コピーに失敗しました';status.style.color='var(--bad)';}
   }));
   editor.querySelectorAll('.rankingClearBtn').forEach(btn=>btn.addEventListener('click',()=>{
     const card=btn.closest('[data-ranking-url]');
@@ -1250,9 +1280,16 @@ function drawRankingWrapped(ctx,text,x,y,maxWidth,lineHeight,maxLines){
   }
   if(line)ctx.fillText(line,x,curY);
 }
-function renderRankingImage(){
+let rankingImageRenderId=0;
+async function renderRankingImage(){
+  const renderId=++rankingImageRenderId;
   const canvas=$('rankingCanvas'),ctx=canvas.getContext('2d'),W=canvas.width,H=canvas.height;
   const ranked=getTopRankings();
+  const productImages=await Promise.all(ranked.map(async c=>{
+    if(!c.image)return null;
+    try{return await loadImageViaProxy(c.image);}catch(e){return null;}
+  }));
+  if(renderId!==rankingImageRenderId)return;
   const bg=ctx.createLinearGradient(0,0,W,H);bg.addColorStop(0,'#07111f');bg.addColorStop(.55,'#123654');bg.addColorStop(1,'#050a13');ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
   ctx.textAlign='center';ctx.fillStyle='#e8c878';ctx.font='900 46px sans-serif';ctx.fillText('✨ メルカリ 型落ちiPhone ✨',W/2,78);
   ctx.fillStyle='#f8fafc';ctx.font='900 58px sans-serif';ctx.fillText('おすすめランキング TOP 3',W/2,148);
@@ -1262,18 +1299,24 @@ function renderRankingImage(){
     const draft=rankingDraft(c),y=238+i*340,x=48,w=W-96,h=300;
     const panel=ctx.createLinearGradient(x,y,x+w,y+h);panel.addColorStop(0,'rgba(28,43,67,.98)');panel.addColorStop(1,'rgba(8,16,30,.98)');ctx.fillStyle=panel;roundRectPath(ctx,x,y,w,h,28);ctx.fill();
     ctx.strokeStyle=i===0?'#e8c878':'rgba(144,180,205,.65)';ctx.lineWidth=i===0?4:2;roundRectPath(ctx,x,y,w,h,28);ctx.stroke();
-    ctx.textAlign='left';ctx.fillStyle='#e8c878';ctx.font='900 38px sans-serif';ctx.fillText(`おすすめランキング${i+1} ${RANK_MEDALS[i]}`,x+30,y+55);
-    ctx.fillStyle='#f8fafc';ctx.font='800 31px sans-serif';drawRankingWrapped(ctx,draft.title||[c.model,c.storage].filter(Boolean).join(' / '),x+30,y+105,w-60,39,2);
-    ctx.fillStyle='#ff7676';ctx.font='900 44px sans-serif';ctx.fillText(c.price?yen(c.price):'価格不明',x+30,y+205);
-    ctx.fillStyle='#cbd5e1';ctx.font='bold 27px sans-serif';ctx.fillText(c.avgPrice?`中古平均価格 ${yen(c.avgPrice)}`:'中古平均価格 データなし',x+30,y+250);
+    ctx.textAlign='left';ctx.fillStyle='#e8c878';ctx.font='900 38px sans-serif';ctx.fillText(`おすすめランキング${RANK_NUMBERS[i]}${RANK_MEDALS[i]}`,x+30,y+55);
+    const imageX=x+30,imageY=y+88,imageSize=152;
+    ctx.save();roundRectPath(ctx,imageX,imageY,imageSize,imageSize,18);ctx.clip();ctx.fillStyle='#d7dde7';ctx.fillRect(imageX,imageY,imageSize,imageSize);
+    const productImage=productImages[i];
+    if(productImage){const scale=Math.max(imageSize/productImage.width,imageSize/productImage.height),dw=productImage.width*scale,dh=productImage.height*scale;ctx.drawImage(productImage,imageX+(imageSize-dw)/2,imageY+(imageSize-dh)/2,dw,dh);}
+    ctx.restore();
+    const textX=imageX+imageSize+28,textW=w-60-imageSize-28;
+    ctx.fillStyle='#f8fafc';ctx.font='800 29px sans-serif';drawRankingWrapped(ctx,draft.title||[c.model,c.storage].filter(Boolean).join(' / '),textX,y+112,textW,37,2);
+    ctx.fillStyle='#ff7676';ctx.font='900 43px sans-serif';ctx.fillText(c.price?yen(c.price):'価格不明',textX,y+205);
+    ctx.fillStyle='#cbd5e1';ctx.font='bold 26px sans-serif';ctx.fillText(c.avgPrice?`中古平均価格 ${yen(c.avgPrice)}`:'中古平均価格 データなし',textX,y+250);
     ctx.textAlign='right';ctx.fillStyle='#45e08a';ctx.font='900 38px sans-serif';ctx.fillText(c.discountRate==null?'比較不能':`${Number(c.discountRate).toFixed(1)}%安`,x+w-30,y+250);
   });
   ctx.textAlign='center';ctx.fillStyle='#8191a8';ctx.font='21px sans-serif';ctx.fillText('※価格・販売状況は商品ページで最新情報をご確認ください',W/2,H-34);
   const dataUrl=canvas.toDataURL('image/png');
   const preview=$('rankingOutputImg'),button=$('downloadRankingBtn');preview.src=dataUrl;preview.style.display=ranked.length?'block':'none';button.disabled=!ranked.length;button.dataset.image=dataUrl;
 }
-$('downloadRankingBtn').addEventListener('click',()=>{
-  renderRankingImage();const dataUrl=$('downloadRankingBtn').dataset.image;if(!dataUrl)return;
+$('downloadRankingBtn').addEventListener('click',async()=>{
+  await renderRankingImage();const dataUrl=$('downloadRankingBtn').dataset.image;if(!dataUrl)return;
   const a=document.createElement('a');a.href=dataUrl;a.download='mercari_recommend_ranking_top3.png';a.click();
 });
 

@@ -9,7 +9,8 @@
  */
 
 var AVG_PRICES_KEY = 'AVG_PRICES_V1';
-var CODE_VERSION = 'ranking-1';
+var AVG_PRICES_UPDATED_AT_KEY = 'AVG_PRICES_UPDATED_AT_V1';
+var CODE_VERSION = 'ranking-2';
 var USER_AGENT = 'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 Chrome/126 Mobile Safari/537.36';
 var LIST_PAGE_USER_AGENTS = [
   'Googlebot/2.1 (+http://www.google.com/bot.html)',
@@ -535,8 +536,10 @@ function saveAvgPrices_(raw) {
       if (value > 0 && value < 10000000) merged[String(key).slice(0, 100)] = Math.round(value);
     });
     Object.keys(clean).forEach(function(key) { merged[key] = clean[key]; });
+    var updatedAt = new Date().toISOString();
     props.setProperty(AVG_PRICES_KEY, JSON.stringify(merged));
-    return {saved:incomingCount, total:Object.keys(merged).length, mode:'merge'};
+    props.setProperty(AVG_PRICES_UPDATED_AT_KEY, updatedAt);
+    return {saved:incomingCount, total:Object.keys(merged).length, mode:'merge', updatedAt:updatedAt};
   } finally {
     lock.releaseLock();
   }
@@ -546,7 +549,7 @@ function getAppConfig_() {
   var raw = PropertiesService.getScriptProperties().getProperty(AVG_PRICES_KEY) || '{}';
   var avgPrices = {};
   try { avgPrices = JSON.parse(raw); } catch (err) { avgPrices = {}; }
-  return {avgPrices:avgPrices};
+  return {avgPrices:avgPrices, updatedAt:PropertiesService.getScriptProperties().getProperty(AVG_PRICES_UPDATED_AT_KEY) || ''};
 }
 
 function unique_(items) {

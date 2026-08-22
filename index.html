@@ -1239,7 +1239,7 @@ function renderRankingEditor(){
     return `<section class="rankingEditCard" data-ranking-url="${esc(c.url)}">
       <div class="rankingEditHead"><b>おすすめランキング${i+1} ${RANK_MEDALS[i]}</b></div>
       <label>商品タイトル</label><input type="text" data-ranking-field="title" value="${esc(draft.title)}">
-      <label>メルカリ商品ページのリンク</label><div class="fieldAction"><input type="url" data-ranking-field="pageUrl" value="${esc(draft.pageUrl)}"><button class="btn-secondary rankingCopyPageBtn" type="button">コピー</button></div><div class="hint rankingCopyStatus"></div>
+      <label>メルカリ商品ページのリンク</label><div class="fieldAction"><input type="url" data-ranking-field="pageUrl" value="${esc(draft.pageUrl)}"><button class="btn-secondary rankingOpenPageBtn" type="button">リンク</button></div><div class="hint rankingLinkStatus"></div>
       <label>メルカリアフィリエイトリンク貼り付け欄</label><div class="fieldAction"><input type="url" data-ranking-field="affiliateUrl" value="${esc(draft.affiliateUrl)}" placeholder="https://jp.mercari.com/item/...?afid=..."><button class="btn-secondary rankingClearBtn" type="button">クリア</button></div>
     </section>`;
   }).join('');
@@ -1255,10 +1255,13 @@ function renderRankingEditor(){
     }
     regenerateAffiliateText();renderRankingImage();
   }));
-  editor.querySelectorAll('.rankingCopyPageBtn').forEach(btn=>btn.addEventListener('click',async()=>{
-    const card=btn.closest('[data-ranking-url]'),pageUrl=card.querySelector('[data-ranking-field="pageUrl"]').value.trim(),status=card.querySelector('.rankingCopyStatus');
-    try{await writeClipboardText(pageUrl);status.textContent='商品ページのリンクをコピーしました';status.style.color='var(--good)';}
-    catch(e){status.textContent='コピーに失敗しました';status.style.color='var(--bad)';}
+  editor.querySelectorAll('.rankingOpenPageBtn').forEach(btn=>btn.addEventListener('click',()=>{
+    const card=btn.closest('[data-ranking-url]'),pageUrl=card.querySelector('[data-ranking-field="pageUrl"]').value.trim(),status=card.querySelector('.rankingLinkStatus');
+    try{
+      const url=new URL(pageUrl);
+      if(url.protocol!=='https:'||url.hostname!=='jp.mercari.com') throw new Error('invalid');
+      window.open(url.toString(),'_blank','noopener,noreferrer');status.textContent='メルカリ商品ページを開きました';status.style.color='var(--good)';
+    }catch(e){status.textContent='メルカリ商品ページのリンクを確認してください';status.style.color='var(--bad)';}
   }));
   editor.querySelectorAll('.rankingClearBtn').forEach(btn=>btn.addEventListener('click',()=>{
     const card=btn.closest('[data-ranking-url]');

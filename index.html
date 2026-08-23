@@ -565,10 +565,10 @@ function saveRankingDraft(url,field,value){
   rankingDrafts[url]={...rankingDrafts[url],[field]:value};
   localStorage.setItem('mercariRankingDraftsV1',JSON.stringify(rankingDrafts));
 }
-function rankingPriceLine(c,draft){
-  const normalized=[c.model,c.storage].filter(Boolean).join(' / ');
-  const title=(draft.title||normalized||'商品タイトル未設定').trim().replace(/\s*(?:by\s+メルカリ|[-｜|]\s*メルカリ)\s*$/i,'');
-  return `${title} by メルカリ　${c.price?yen(c.price):'価格不明'}`;
+function rankingPriceLine(c){
+  const storage=String(c.storage||'').trim().replace(/GB$/i,'G');
+  const productName=[String(c.model||'').trim(),storage].filter(Boolean).join(' ')||'商品名未設定';
+  return `${productName}　${c.price?yen(c.price):'価格不明'}`;
 }
 function rankingDiscountLine(c){
   if(!c.avgPrice||c.discountRate==null) return '中古平均価格 データなし / 比較不能';
@@ -581,7 +581,7 @@ function buildAffiliateText(){
   const blocks=ranked.map((c,i)=>{
     const draft=rankingDraft(c);
     const affiliate=draft.affiliateUrl.trim()||'(メルカリアフィリエイトリンク未入力)';
-    return `🉐おすすめランキング${RANK_NUMBERS[i]}${RANK_MEDALS[i]}\n${rankingPriceLine(c,draft)}\n${rankingDiscountLine(c)}\n商品はこちら👉  ${affiliate}`;
+    return `🉐おすすめランキング${RANK_NUMBERS[i]}${RANK_MEDALS[i]}\n${rankingPriceLine(c)}\n${rankingDiscountLine(c)}\n商品はこちら👉  ${affiliate}`;
   });
   return `✨メルカリ✨型落ちiPhone🤓👍\n${blocks.length?'\n'+blocks.join('\n\n')+'\n':''}[PR] mercari ambassador`;
 }

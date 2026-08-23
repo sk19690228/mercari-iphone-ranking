@@ -570,18 +570,12 @@ function rankingPriceLine(c){
   const productName=[String(c.model||'').trim(),storage].filter(Boolean).join(' ')||'商品名未設定';
   return `${productName}　${c.price?yen(c.price):'価格不明'}`;
 }
-function rankingDiscountLine(c){
-  if(!c.avgPrice||c.discountRate==null) return '中古平均価格 データなし / 比較不能';
-  const diff=Number(c.avgPrice)-Number(c.price||0);
-  const sign=diff>=0?'-':'+';
-  return `中古平均価格 ${yen(c.avgPrice)} / ${sign}${yen(Math.abs(diff))}（${Number(c.discountRate).toFixed(1)}%安）`;
-}
 function buildAffiliateText(){
   const ranked=getTopRankings();
   const blocks=ranked.map((c,i)=>{
     const draft=rankingDraft(c);
     const affiliate=draft.affiliateUrl.trim()||'(メルカリアフィリエイトリンク未入力)';
-    return `🉐おすすめランキング${RANK_NUMBERS[i]}${RANK_MEDALS[i]}\n${rankingPriceLine(c)}\n${rankingDiscountLine(c)}\n商品はこちら👉  ${affiliate}`;
+    return `🉐おすすめランキング${RANK_NUMBERS[i]}${RANK_MEDALS[i]}\n${rankingPriceLine(c)}\n👉  ${affiliate}`;
   });
   return `✨メルカリ✨型落ちiPhone🤓👍\n${blocks.length?'\n'+blocks.join('\n\n')+'\n':''}[PR] mercari ambassador`;
 }

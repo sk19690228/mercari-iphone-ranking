@@ -529,6 +529,10 @@ regeneratePostText();
 const rankingDrafts = (()=>{
   try{return JSON.parse(localStorage.getItem('mercariRankingDraftsV1')||'{}')||{};}catch(e){return {};}
 })();
+Object.keys(rankingDrafts).forEach(url=>{
+  if(rankingDrafts[url]&&typeof rankingDrafts[url]==='object') rankingDrafts[url].affiliateUrl='';
+});
+localStorage.setItem('mercariRankingDraftsV1',JSON.stringify(rankingDrafts));
 const RANK_MEDALS=['🥇','🥈','🥉'];
 const RANK_NUMBERS=['①','②','③'];
 const MERCARI_AFFILIATE_ID='9289281257';
@@ -551,11 +555,10 @@ function getTopRankings(){
 function rankingDraft(c){
   const saved=rankingDrafts[c.url]||{};
   const pageUrl=saved.pageUrl!==undefined?saved.pageUrl:(c.url||'');
-  const hasAffiliate=Object.prototype.hasOwnProperty.call(saved,'affiliateUrl');
   return {
     title:saved.title!==undefined?saved.title:(c.title||''),
     pageUrl,
-    affiliateUrl:hasAffiliate?saved.affiliateUrl:buildMercariAffiliateUrl(pageUrl)
+    affiliateUrl:saved.affiliateUrl!==undefined?saved.affiliateUrl:''
   };
 }
 function saveRankingDraft(url,field,value){

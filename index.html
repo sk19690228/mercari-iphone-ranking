@@ -1291,7 +1291,8 @@ async function refreshRankingImage(message='入力内容でランキング画像
   button.disabled=true;status.textContent='ランキング画像を更新しています...';status.className='status loading';
   const updated=await renderRankingImage();
   if(!updated)return;
-  status.textContent=message;status.className='status ok';
+  status.textContent=`${message}（${new Date().toLocaleTimeString('ja-JP')}）`;status.className='status ok';
+  $('rankingOutputImg').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
 function drawRankingWrapped(ctx,text,x,y,maxWidth,lineHeight,maxLines){
@@ -1305,7 +1306,7 @@ function drawRankingWrapped(ctx,text,x,y,maxWidth,lineHeight,maxLines){
   }
   if(line)ctx.fillText(line,x,curY);
 }
-let rankingImageRenderId=0;
+let rankingImageRenderId=0,rankingPreviewObjectUrl='';
 async function renderRankingImage(){
   const renderId=++rankingImageRenderId;
   const canvas=$('rankingCanvas'),ctx=canvas.getContext('2d'),W=canvas.width,H=canvas.height;
@@ -1337,13 +1338,19 @@ async function renderRankingImage(){
     ctx.textAlign='right';ctx.fillStyle='#45e08a';ctx.font='900 38px sans-serif';ctx.fillText(c.discountRate==null?'比較不能':`${Number(c.discountRate).toFixed(1)}%安`,x+w-30,y+250);
   });
   ctx.textAlign='center';ctx.fillStyle='#8191a8';ctx.font='21px sans-serif';ctx.fillText('※価格・販売状況は商品ページで最新情報をご確認ください',W/2,H-34);
+  const previewBlob=ranked.length?await new Promise(resolve=>canvas.toBlob(resolve,'image/png')):null;
+  if(renderId!==rankingImageRenderId)return false;
   const dataUrl=canvas.toDataURL('image/png');
   const preview=$('rankingOutputImg'),button=$('downloadRankingBtn'),refreshButton=$('refreshRankingImageBtn'),status=$('rankingImageStatus');
-  preview.src=dataUrl;preview.style.display=ranked.length?'block':'none';button.disabled=!ranked.length;button.dataset.image=dataUrl;refreshButton.disabled=!ranked.length;
+  if(rankingPreviewObjectUrl){URL.revokeObjectURL(rankingPreviewObjectUrl);rankingPreviewObjectUrl='';}
+  if(previewBlob){rankingPreviewObjectUrl=URL.createObjectURL(previewBlob);preview.src=rankingPreviewObjectUrl;}
+  else if(ranked.length) preview.src=dataUrl;
+  else preview.removeAttribute('src');
+  preview.style.display=ranked.length?'block':'none';button.disabled=!ranked.length;button.dataset.image=dataUrl;refreshButton.disabled=!ranked.length;
   status.textContent=ranked.length?'ランキング画像は現在の入力内容で更新済みです':'';status.className='status'+(ranked.length?' ok':'');
   return true;
 }
-$('refreshRankingImageBtn').addEventListener('click',()=>refreshRankingImage());
+$('refreshRankingImageBtn').addEventListener('click',async()=>{await refreshRankingImage('新しいランキング画像を表示しました');});
 $('downloadRankingBtn').addEventListener('click',async()=>{
   const updated=await renderRankingImage();const dataUrl=$('downloadRankingBtn').dataset.image;if(!updated||!dataUrl)return;
   const a=document.createElement('a');a.href=dataUrl;a.download='mercari_recommend_ranking_top3.png';a.click();

@@ -10,7 +10,7 @@
 
 var AVG_PRICES_KEY = 'AVG_PRICES_V1';
 var AVG_PRICES_UPDATED_AT_KEY = 'AVG_PRICES_UPDATED_AT_V1';
-var CODE_VERSION = 'ranking-2';
+var CODE_VERSION = 'ranking-3';
 var USER_AGENT = 'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 Chrome/126 Mobile Safari/537.36';
 var LIST_PAGE_USER_AGENTS = [
   'Googlebot/2.1 (+http://www.google.com/bot.html)',
@@ -354,20 +354,37 @@ function fetchItem_(url) {
 
 function extractPrice_(text) {
   var source = String(text || '');
+  // Mercariの商品ページが公開している商品価格専用metaを最優先する。
+  // ページ全体の「価格」付近には翻訳文・手数料・年なども含まれるため、
+  // 一般的な文字列検索を先に行うと別の数値を商品価格として誤認する。
+  var metaPrice = firstNonEmpty_([
+    metaContent_(source, 'property', 'product:price:amount'),
+    metaContent_(source, 'name', 'product:price:amount'),
+    metaContent_(source, 'itemprop', 'price')
+  ]);
+  var value = normalizePrice_(metaPrice);
+  if (value) return value;
+
   var patterns = [
+    /"priceCurrency"\s*:\s*"JPY"[\s\S]{0,300}?"price"\s*:\s*"?([\d,]{3,12})"?/i,
     /"price"\s*:\s*"?(\d{3,9})"?/i,
-    /(?:販売価格|商品価格|価格)[^\d]{0,20}[¥￥]?\s*([\d,]{3,12})\s*円?/i,
+    /(?:販売価格|商品価格)[^\d¥￥]{0,12}[¥￥]\s*([\d,]{3,12})/i,
     /[¥￥]\s*([\d,]{3,12})/,
-    /([\d,]{3,12})\s*円/
+    /([\d,]{3,12})\s*円(?:\s|<|$)/
   ];
   for (var i = 0; i < patterns.length; i++) {
     var match = source.match(patterns[i]);
     if (match) {
-      var value = Number(match[1].replace(/,/g, ''));
-      if (value >= 1000 && value <= 999999999) return value;
+      value = normalizePrice_(match[1]);
+      if (value) return value;
     }
   }
   return 0;
+}
+
+function normalizePrice_(value) {
+  var price = Number(String(value || '').replace(/[^\d]/g, ''));
+  return price >= 1000 && price <= 999999999 ? price : 0;
 }
 
 function metaContent_(html, attr, value) {

@@ -575,9 +575,9 @@ function buildAffiliateText(){
   const blocks=ranked.map((c,i)=>{
     const draft=rankingDraft(c);
     const affiliate=draft.affiliateUrl.trim()||'(メルカリアフィリエイトリンク未入力)';
-    return `🉐おすすめランキング${RANK_NUMBERS[i]}${RANK_MEDALS[i]}\n${rankingPriceLine(c)}\n👉  ${affiliate}`;
+    return `🉐ランキング${RANK_NUMBERS[i]}${RANK_MEDALS[i]}\n${rankingPriceLine(c)}\n👉  ${affiliate}`;
   });
-  return `✨メルカリ✨型落ちiPhone🤓👍\n${blocks.length?'\n'+blocks.join('\n\n')+'\n':''}[PR] mercari ambassador`;
+  return `✨メルカリ✨おすすめiPhone🤓👍\n${blocks.length?'\n'+blocks.join('\n\n')+'\n':''}[PR] mercari ambassador`;
 }
 function regenerateAffiliateText(){ $('affiliateText').value = buildAffiliateText(); }
 function saveAffiliateLinks(){

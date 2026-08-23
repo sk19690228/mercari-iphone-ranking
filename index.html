@@ -132,8 +132,10 @@
 
   <div class="card">
     <h2>おすすめランキング画像</h2>
-    <div class="hint">おすすめランキング1～3を、1枚の画像にまとめます。</div>
+    <div class="hint">おすすめランキング1～3を、1枚の画像にまとめます。アフィリエイトリンクの入力確定時に画像を自動更新します。</div>
+    <button class="btn-secondary" id="refreshRankingImageBtn" type="button" disabled>入力内容で画像を更新</button>
     <button class="btn-primary" id="downloadRankingBtn" type="button" disabled>ランキング画像をダウンロード</button>
+    <div class="status" id="rankingImageStatus"></div>
     <img id="rankingOutputImg" alt="おすすめランキング1位から3位をまとめた画像">
     <canvas id="rankingCanvas" width="1080" height="1350"></canvas>
   </div>
@@ -1253,7 +1255,10 @@ function renderRankingEditor(){
         if(generated){affiliate.value=generated;saveRankingDraft(card.dataset.rankingUrl,'affiliateUrl',generated);}
       }
     }
-    regenerateAffiliateText();renderRankingImage();
+    regenerateAffiliateText();markRankingImageStale();
+  }));
+  editor.querySelectorAll('[data-ranking-field="affiliateUrl"]').forEach(input=>input.addEventListener('change',()=>{
+    refreshRankingImage('アフィリエイトリンクの入力内容で画像を更新しました');
   }));
   editor.querySelectorAll('.rankingOpenPageBtn').forEach(btn=>btn.addEventListener('click',()=>{
     const card=btn.closest('[data-ranking-url]'),pageUrl=card.querySelector('[data-ranking-field="pageUrl"]').value.trim(),status=card.querySelector('.rankingLinkStatus');
@@ -1267,9 +1272,23 @@ function renderRankingEditor(){
     const card=btn.closest('[data-ranking-url]');
     const affiliate=card.querySelector('[data-ranking-field="affiliateUrl"]');
     affiliate.value='';saveRankingDraft(card.dataset.rankingUrl,'affiliateUrl','');
-    regenerateAffiliateText();renderRankingImage();affiliate.focus();
+    regenerateAffiliateText();markRankingImageStale();refreshRankingImage('アフィリエイトリンクをクリアして画像を更新しました');affiliate.focus();
   }));
   regenerateAffiliateText();renderRankingImage();
+}
+
+function markRankingImageStale(){
+  const ranked=getTopRankings(),button=$('refreshRankingImageBtn'),status=$('rankingImageStatus');
+  button.disabled=!ranked.length;
+  status.textContent=ranked.length?'入力内容が変更されています。画像を更新してください':'';
+  status.className='status'+(ranked.length?' loading':'');
+}
+async function refreshRankingImage(message='入力内容でランキング画像を更新しました'){
+  const button=$('refreshRankingImageBtn'),status=$('rankingImageStatus');
+  button.disabled=true;status.textContent='ランキング画像を更新しています...';status.className='status loading';
+  const updated=await renderRankingImage();
+  if(!updated)return;
+  status.textContent=message;status.className='status ok';
 }
 
 function drawRankingWrapped(ctx,text,x,y,maxWidth,lineHeight,maxLines){
@@ -1292,7 +1311,7 @@ async function renderRankingImage(){
     if(!c.image)return null;
     try{return await loadImageViaProxy(c.image);}catch(e){return null;}
   }));
-  if(renderId!==rankingImageRenderId)return;
+  if(renderId!==rankingImageRenderId)return false;
   const bg=ctx.createLinearGradient(0,0,W,H);bg.addColorStop(0,'#07111f');bg.addColorStop(.55,'#123654');bg.addColorStop(1,'#050a13');ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
   ctx.textAlign='center';ctx.fillStyle='#e8c878';ctx.font='900 46px sans-serif';ctx.fillText('✨ メルカリ 型落ちiPhone ✨',W/2,78);
   ctx.fillStyle='#f8fafc';ctx.font='900 58px sans-serif';ctx.fillText('おすすめランキング TOP 3',W/2,148);
@@ -1316,11 +1335,16 @@ async function renderRankingImage(){
   });
   ctx.textAlign='center';ctx.fillStyle='#8191a8';ctx.font='21px sans-serif';ctx.fillText('※価格・販売状況は商品ページで最新情報をご確認ください',W/2,H-34);
   const dataUrl=canvas.toDataURL('image/png');
-  const preview=$('rankingOutputImg'),button=$('downloadRankingBtn');preview.src=dataUrl;preview.style.display=ranked.length?'block':'none';button.disabled=!ranked.length;button.dataset.image=dataUrl;
+  const preview=$('rankingOutputImg'),button=$('downloadRankingBtn'),refreshButton=$('refreshRankingImageBtn'),status=$('rankingImageStatus');
+  preview.src=dataUrl;preview.style.display=ranked.length?'block':'none';button.disabled=!ranked.length;button.dataset.image=dataUrl;refreshButton.disabled=!ranked.length;
+  status.textContent=ranked.length?'ランキング画像は現在の入力内容で更新済みです':'';status.className='status'+(ranked.length?' ok':'');
+  return true;
 }
+$('refreshRankingImageBtn').addEventListener('click',()=>refreshRankingImage());
 $('downloadRankingBtn').addEventListener('click',async()=>{
-  await renderRankingImage();const dataUrl=$('downloadRankingBtn').dataset.image;if(!dataUrl)return;
+  const updated=await renderRankingImage();const dataUrl=$('downloadRankingBtn').dataset.image;if(!updated||!dataUrl)return;
   const a=document.createElement('a');a.href=dataUrl;a.download='mercari_recommend_ranking_top3.png';a.click();
+  $('rankingImageStatus').textContent='最新の入力内容で画像を更新し、ダウンロードしました';$('rankingImageStatus').className='status ok';
 });
 
 function renderCandidates(){

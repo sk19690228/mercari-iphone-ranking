@@ -625,9 +625,10 @@ function buildRanking1Recommendation(details){
   if(points[1])body+=`。${points[1]}`;
   body+='。毎日使うものだから、こういう実用面がしっかりした1台は個人的にうれしいです。';
   const createdAt=new Date();
-  const title=`（${createdAt.getFullYear()}年${createdAt.getMonth()+1}月${createdAt.getDate()}日）最新おすすめランキング１位`;
-  const heading='ランキング１🥇ここがオススメ✨';
-  const prefix=title+'\n'+heading;
+  const createdDate=`（${createdAt.getFullYear()}年${createdAt.getMonth()+1}月${createdAt.getDate()}日）`;
+  const title='最新オススメランキング１位🥇';
+  const heading='ここがオススメ✨';
+  const prefix=[createdDate,title,heading].join('\n');
   return prefix+'\n'+limitRecommendationBody(body,130-prefix.length-1);
 }
 function bindRankingRecommendationEvents(){

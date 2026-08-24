@@ -141,6 +141,16 @@
   </div>
 
   <div class="card">
+    <h2>ランキング1位 おすすめ文</h2>
+    <label for="ranking1Details">ランキング1位の商品詳細</label>
+    <textarea id="ranking1Details" rows="5" placeholder="商品の状態、バッテリー最大容量、容量、付属品、SIMフリーなどを入力してください"></textarea>
+    <button class="btn-primary" id="generateRecommendationBtn" type="button">おすすめ文を作成</button>
+    <textarea id="recommendationText" rows="5" readonly placeholder="作成したおすすめ文がここに表示されます"></textarea>
+    <button class="btn-secondary" id="copyRecommendationBtn" type="button" disabled>おすすめ文をコピー</button>
+    <div class="status" id="recommendationStatus"></div>
+  </div>
+
+  <div class="card">
     <h2>PR表記・アフィリエイトリンク</h2>
     <textarea id="affiliateText" rows="7" style="font-size:14px;"></textarea>
     <button class="btn-primary" id="copyAffiliateBtn">コピー</button>
@@ -596,6 +606,47 @@ $('clearAmazonAffiliateBtn').addEventListener('click',()=>{
 });
 regenerateAffiliateText();
 
+function limitRecommendationBody(text,maxLength){
+  const value=String(text||'').trim();
+  if(value.length<=maxLength)return value;
+  const cut=value.slice(0,Math.max(1,maxLength-1));
+  const lastStop=Math.max(cut.lastIndexOf('。'),cut.lastIndexOf('！'),cut.lastIndexOf('!'));
+  return lastStop>=Math.floor(maxLength*.55)?cut.slice(0,lastStop+1):cut.trimEnd()+'…';
+}
+function buildRanking1Recommendation(details){
+  const source=String(details||'').replace(/https?:\/\/\S+/g,'').replace(/\s+/g,' ').trim();
+  if(!source)return '';
+  const points=[];
+  const battery=source.match(/(?:バッテリー(?:\s*最大)?\s*容量|最大\s*容量)[^\d%]{0,18}(\d{2,3})\s*%/i);
+  const storage=source.match(/(?:^|\D)(16|32|64|128|256|512)\s*(?:GB|G|ギガ)(?:\D|$)/i)||source.match(/(?:^|\D)(1|2)\s*TB(?:\D|$)/i);
+  const condition=['新品、未使用','新品・未使用','未使用に近い','目立った傷や汚れなし','美品'].find(value=>source.includes(value));
+  if(condition)points.push(`「${condition.replace('新品・未使用','新品、未使用')}」なのは、中古を選ぶうえで安心材料`);
+  if(battery){const value=Number(battery[1]);points.push(`バッテリー${value}%なら、外出先でも残量を気にしすぎず使えそう`);}
+  if(storage){const capacity=/TB/i.test(storage[0])?storage[1]+'TB':storage[1]+'GB';points.push(`${capacity}なら、写真やアプリも余裕を持って保存しやすい`);}
+  if(/SIM\s*フリー|シムフリー|SIM\s*ロック\s*(?:なし|解除済)/i.test(source))points.push('SIMフリーで回線を選びやすいのも助かる');
+  if(/付属品|箱付き|ケーブル付き|充電器付き/i.test(source))points.push('付属品の記載があるのも、地味だけどうれしいポイント');
+  if(!points.length){
+    const excerpt=source.slice(0,46)+(source.length>46?'…':'');
+    points.push(`説明を読んで「${excerpt}」という部分に惹かれたのが本音`);
+  }
+  let body=`正直、${points[0]}です`;
+  if(points[1])body+=`。${points[1]}`;
+  body+='。毎日使うものだから、こういう実用面がしっかりした1台は個人的にうれしいです。';
+  const heading='ランキング１🥇ここがオススメ✨';
+  return heading+'\n'+limitRecommendationBody(body,130-heading.length-1);
+}
+$('ranking1Details').addEventListener('input',()=>{
+  $('recommendationText').value='';$('copyRecommendationBtn').disabled=true;
+  $('recommendationStatus').textContent='';$('recommendationStatus').className='status';
+});
+$('generateRecommendationBtn').addEventListener('click',()=>{
+  const recommendation=buildRanking1Recommendation($('ranking1Details').value);
+  const status=$('recommendationStatus');
+  if(!recommendation){status.textContent='ランキング1位の商品詳細を入力してください';status.className='status err';$('ranking1Details').focus();return;}
+  $('recommendationText').value=recommendation;$('copyRecommendationBtn').disabled=false;
+  status.textContent=`おすすめ文を作成しました（${recommendation.length}/130文字）`;status.className='status ok';
+});
+
 async function copyTextToClipboard(text, statusId){
   const statusEl = $(statusId);
   try {
@@ -616,6 +667,7 @@ function copyTextFrom(textareaId, statusId){
   return copyTextToClipboard($(textareaId).value, statusId);
 }
 $('copyAffiliateBtn').addEventListener('click', () => copyTextFrom('affiliateText','copyAffiliateStatus'));
+$('copyRecommendationBtn').addEventListener('click',()=>copyTextFrom('recommendationText','recommendationStatus'));
 
 // ========== ① 取得 ==========
 async function fetchHtmlViaProxies(url){

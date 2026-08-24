@@ -83,6 +83,8 @@
   .rankingEditHead b{color:var(--accent);font-size:14px;}
   .rankingEditHead .btn-secondary{width:auto;margin:0;padding:7px 12px;font-size:12px;}
   .rankingCopyStatus{min-height:16px;margin-top:4px;}
+  .rankingRecommendationBox{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);}
+  .rankingRecommendationBox h3{margin:0 0 10px;color:var(--text);font-size:15px;}
   #rankingOutputImg{width:100%;border-radius:16px;margin-top:12px;border:1px solid var(--border);display:none;background:#07111f;}
   #rankingCanvas{display:none;}
 </style>
@@ -138,16 +140,6 @@
     <div class="status" id="rankingImageStatus"></div>
     <img id="rankingOutputImg" alt="おすすめランキング1位から3位をまとめた画像">
     <canvas id="rankingCanvas" width="1080" height="1350"></canvas>
-  </div>
-
-  <div class="card">
-    <h2>ランキング1位 おすすめ文</h2>
-    <label for="ranking1Details">ランキング1位の商品詳細</label>
-    <textarea id="ranking1Details" rows="5" placeholder="商品の状態、バッテリー最大容量、容量、付属品、SIMフリーなどを入力してください"></textarea>
-    <button class="btn-primary" id="generateRecommendationBtn" type="button">おすすめ文を作成</button>
-    <textarea id="recommendationText" rows="5" readonly placeholder="作成したおすすめ文がここに表示されます"></textarea>
-    <button class="btn-secondary" id="copyRecommendationBtn" type="button" disabled>おすすめ文をコピー</button>
-    <div class="status" id="recommendationStatus"></div>
   </div>
 
   <div class="card">
@@ -635,17 +627,22 @@ function buildRanking1Recommendation(details){
   const heading='ランキング１🥇ここがオススメ✨';
   return heading+'\n'+limitRecommendationBody(body,130-heading.length-1);
 }
-$('ranking1Details').addEventListener('input',()=>{
-  $('recommendationText').value='';$('copyRecommendationBtn').disabled=true;
-  $('recommendationStatus').textContent='';$('recommendationStatus').className='status';
-});
-$('generateRecommendationBtn').addEventListener('click',()=>{
-  const recommendation=buildRanking1Recommendation($('ranking1Details').value);
-  const status=$('recommendationStatus');
-  if(!recommendation){status.textContent='ランキング1位の商品詳細を入力してください';status.className='status err';$('ranking1Details').focus();return;}
-  $('recommendationText').value=recommendation;$('copyRecommendationBtn').disabled=false;
-  status.textContent=`おすすめ文を作成しました（${recommendation.length}/130文字）`;status.className='status ok';
-});
+function bindRankingRecommendationEvents(){
+  const details=$('ranking1Details'),generateButton=$('generateRecommendationBtn'),copyButton=$('copyRecommendationBtn');
+  if(!details||!generateButton||!copyButton)return;
+  details.addEventListener('input',()=>{
+    $('recommendationText').value='';copyButton.disabled=true;
+    $('recommendationStatus').textContent='';$('recommendationStatus').className='status';
+  });
+  generateButton.addEventListener('click',()=>{
+    const recommendation=buildRanking1Recommendation(details.value);
+    const status=$('recommendationStatus');
+    if(!recommendation){status.textContent='ランキング1位の商品詳細を入力してください';status.className='status err';details.focus();return;}
+    $('recommendationText').value=recommendation;copyButton.disabled=false;
+    status.textContent=`おすすめ文を作成しました（${recommendation.length}/130文字）`;status.className='status ok';
+  });
+  copyButton.addEventListener('click',()=>copyTextFrom('recommendationText','recommendationStatus'));
+}
 
 async function copyTextToClipboard(text, statusId){
   const statusEl = $(statusId);
@@ -667,7 +664,6 @@ function copyTextFrom(textareaId, statusId){
   return copyTextToClipboard($(textareaId).value, statusId);
 }
 $('copyAffiliateBtn').addEventListener('click', () => copyTextFrom('affiliateText','copyAffiliateStatus'));
-$('copyRecommendationBtn').addEventListener('click',()=>copyTextFrom('recommendationText','recommendationStatus'));
 
 // ========== ① 取得 ==========
 async function fetchHtmlViaProxies(url){
@@ -1292,8 +1288,18 @@ function renderRankingEditor(){
       <label>商品タイトル</label><input type="text" data-ranking-field="title" value="${esc(draft.title)}">
       <label>メルカリ商品ページのリンク</label><div class="fieldAction"><input type="url" data-ranking-field="pageUrl" value="${esc(draft.pageUrl)}"><button class="btn-secondary rankingOpenPageBtn" type="button">リンク</button></div><div class="hint rankingLinkStatus"></div>
       <label>メルカリアフィリエイトリンク貼り付け欄</label><div class="fieldAction"><input type="url" data-ranking-field="affiliateUrl" value="${esc(draft.affiliateUrl)}" placeholder="https://jp.mercari.com/item/...?afid=..."><button class="btn-secondary rankingClearBtn" type="button">クリア</button></div>
+      ${i===0?`<div class="rankingRecommendationBox">
+        <h3>ランキング1位 おすすめ文</h3>
+        <label for="ranking1Details">ランキング1位の商品詳細</label>
+        <textarea id="ranking1Details" rows="5" placeholder="商品の状態、バッテリー最大容量、容量、付属品、SIMフリーなどを入力してください"></textarea>
+        <button class="btn-primary" id="generateRecommendationBtn" type="button">おすすめ文を作成</button>
+        <textarea id="recommendationText" rows="5" readonly placeholder="作成したおすすめ文がここに表示されます"></textarea>
+        <button class="btn-secondary" id="copyRecommendationBtn" type="button" disabled>おすすめ文をコピー</button>
+        <div class="status" id="recommendationStatus"></div>
+      </div>`:''}
     </section>`;
   }).join('');
+  bindRankingRecommendationEvents();
   editor.querySelectorAll('[data-ranking-field]').forEach(input=>input.addEventListener('input',()=>{
     const card=input.closest('[data-ranking-url]');
     saveRankingDraft(card.dataset.rankingUrl,input.dataset.rankingField,input.value);

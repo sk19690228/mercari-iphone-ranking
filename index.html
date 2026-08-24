@@ -143,6 +143,14 @@
   </div>
 
   <div class="card">
+    <h2>おすすめ文を作成・コピー</h2>
+    <button class="btn-primary" id="generateRecommendationBtn" type="button">おすすめ文を作成</button>
+    <textarea id="recommendationText" rows="5" readonly placeholder="作成したおすすめ文がここに表示されます"></textarea>
+    <button class="btn-secondary" id="copyRecommendationBtn" type="button" disabled>おすすめ文をコピー</button>
+    <div class="status" id="recommendationStatus"></div>
+  </div>
+
+  <div class="card">
     <h2>PR表記・アフィリエイトリンク</h2>
     <textarea id="affiliateText" rows="7" style="font-size:14px;"></textarea>
     <button class="btn-primary" id="copyAffiliateBtn">コピー</button>
@@ -632,21 +640,23 @@ function buildRanking1Recommendation(details){
   return prefix+'\n'+limitRecommendationBody(body,130-prefix.length-1);
 }
 function bindRankingRecommendationEvents(){
-  const details=$('ranking1Details'),generateButton=$('generateRecommendationBtn'),copyButton=$('copyRecommendationBtn');
-  if(!details||!generateButton||!copyButton)return;
+  const details=$('ranking1Details');
+  if(!details)return;
+  $('recommendationText').value='';$('copyRecommendationBtn').disabled=true;
+  $('recommendationStatus').textContent='';$('recommendationStatus').className='status';
   details.addEventListener('input',()=>{
-    $('recommendationText').value='';copyButton.disabled=true;
+    $('recommendationText').value='';$('copyRecommendationBtn').disabled=true;
     $('recommendationStatus').textContent='';$('recommendationStatus').className='status';
   });
-  generateButton.addEventListener('click',()=>{
-    const recommendation=buildRanking1Recommendation(details.value);
-    const status=$('recommendationStatus');
-    if(!recommendation){status.textContent='ランキング1位の商品詳細を入力してください';status.className='status err';details.focus();return;}
-    $('recommendationText').value=recommendation;copyButton.disabled=false;
-    status.textContent=`おすすめ文を作成しました（${recommendation.length}/130文字）`;status.className='status ok';
-  });
-  copyButton.addEventListener('click',()=>copyTextFrom('recommendationText','recommendationStatus'));
 }
+$('generateRecommendationBtn').addEventListener('click',()=>{
+  const details=$('ranking1Details'),status=$('recommendationStatus');
+  const recommendation=buildRanking1Recommendation(details?details.value:'');
+  if(!recommendation){status.textContent='ランキング1位の商品詳細を入力してください';status.className='status err';if(details)details.focus();return;}
+  $('recommendationText').value=recommendation;$('copyRecommendationBtn').disabled=false;
+  status.textContent=`おすすめ文を作成しました（${recommendation.length}/130文字）`;status.className='status ok';
+});
+$('copyRecommendationBtn').addEventListener('click',()=>copyTextFrom('recommendationText','recommendationStatus'));
 
 async function copyTextToClipboard(text, statusId){
   const statusEl = $(statusId);
@@ -1293,13 +1303,9 @@ function renderRankingEditor(){
       <label>メルカリ商品ページのリンク</label><div class="fieldAction"><input type="url" data-ranking-field="pageUrl" value="${esc(draft.pageUrl)}"><button class="btn-secondary rankingOpenPageBtn" type="button">リンク</button></div><div class="hint rankingLinkStatus"></div>
       <label>メルカリアフィリエイトリンク貼り付け欄</label><div class="fieldAction"><input type="url" data-ranking-field="affiliateUrl" value="${esc(draft.affiliateUrl)}" placeholder="https://jp.mercari.com/item/...?afid=..."><button class="btn-secondary rankingClearBtn" type="button">クリア</button></div>
       ${i===0?`<div class="rankingRecommendationBox">
-        <h3>ランキング1位 おすすめ文</h3>
+        <h3>ランキング1位 商品情報入力</h3>
         <label for="ranking1Details">ランキング1位の商品詳細</label>
         <textarea id="ranking1Details" rows="5" placeholder="商品の状態、バッテリー最大容量、容量、付属品、SIMフリーなどを入力してください"></textarea>
-        <button class="btn-primary" id="generateRecommendationBtn" type="button">おすすめ文を作成</button>
-        <textarea id="recommendationText" rows="5" readonly placeholder="作成したおすすめ文がここに表示されます"></textarea>
-        <button class="btn-secondary" id="copyRecommendationBtn" type="button" disabled>おすすめ文をコピー</button>
-        <div class="status" id="recommendationStatus"></div>
       </div>`:''}
     </section>`;
   }).join('');

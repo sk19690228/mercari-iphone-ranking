@@ -624,8 +624,11 @@ function buildRanking1Recommendation(details){
   let body=`正直、${points[0]}です`;
   if(points[1])body+=`。${points[1]}`;
   body+='。毎日使うものだから、こういう実用面がしっかりした1台は個人的にうれしいです。';
+  const createdAt=new Date();
+  const title=`（${createdAt.getFullYear()}年${createdAt.getMonth()+1}月${createdAt.getDate()}日）最新おすすめランキング１位`;
   const heading='ランキング１🥇ここがオススメ✨';
-  return heading+'\n'+limitRecommendationBody(body,130-heading.length-1);
+  const prefix=title+'\n'+heading;
+  return prefix+'\n'+limitRecommendationBody(body,130-prefix.length-1);
 }
 function bindRankingRecommendationEvents(){
   const details=$('ranking1Details'),generateButton=$('generateRecommendationBtn'),copyButton=$('copyRecommendationBtn');

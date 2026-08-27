@@ -606,7 +606,6 @@ $('clearAmazonAffiliateBtn').addEventListener('click',()=>{
 });
 regenerateAffiliateText();
 
-const IPHONE17_NEW_REFERENCE_PRICE=142800;
 const RECOMMENDATION_MAX_LENGTH=120;
 function compactYen(value){
   const amount=Math.max(0,Math.round(Number(value)||0));
@@ -616,46 +615,41 @@ function compactYen(value){
   }
   return `${amount}円`;
 }
-function recommendationProductNote(source,ranking,maxParts=2){
-  const parts=[];
+function recommendationProductBenefits(source,ranking){
+  const benefits=[];
+  const evidence=[];
   const battery=source.match(/(?:バッテリー(?:\s*最大)?\s*容量|最大\s*容量)[^\d%]{0,18}(\d{2,3})\s*%/i);
-  const condition=['新品、未使用','新品・未使用','未使用に近い','目立った傷や汚れなし','美品'].find(value=>source.includes(value));
+  const condition=['新品、未使用','新品・未使用','未使用に近い','目立った傷や汚れなし','やや傷や汚れあり','美品'].find(value=>source.includes(value));
+  const primary=[];
   if(condition){
-    const shortCondition={'新品、未使用':'新品未使用','新品・未使用':'新品未使用','未使用に近い':'未使用級','目立った傷や汚れなし':'傷少なめ','美品':'美品'}[condition];
-    parts.push(shortCondition);
+    const shortCondition={'新品、未使用':'新品未使用','新品・未使用':'新品未使用','未使用に近い':'未使用級','目立った傷や汚れなし':'傷少なめ','やや傷や汚れあり':'使用感あり','美品':'美品'}[condition];
+    primary.push(shortCondition);evidence.push(shortCondition);
   }
-  if(battery)parts.push(`電池${Number(battery[1])}%`);
+  if(battery){const label=`電池${Number(battery[1])}%`;primary.push(label);evidence.push(label);}
+  if(primary.length)benefits.push(primary.slice(0,2).join('＋')+(condition&&condition.includes('やや')?'で価格重視向き👀':'で安心🔋'));
+  if(/動作確認済み|動作良好|完動品/i.test(source)){benefits.push('動作確認済みで安心✅');evidence.push('動作確認済み');}
+  if(/(?:画面|液晶)[^\s。、]{0,8}(?:きれい|綺麗|美品)/i.test(source)){benefits.push('画面もきれいで見やすい✨');evidence.push('画面もきれい');}
   const storage=source.match(/(?:^|\D)(16|32|64|128|256|512)\s*(?:GB|G|ギガ)(?:\D|$)/i)||source.match(/(?:^|\D)(1|2)\s*TB(?:\D|$)/i);
   const capacity=storage?(/TB/i.test(storage[0])?storage[1]+'TB':storage[1]+'G'):String(ranking&&ranking.storage||'').replace(/GB$/i,'G');
-  if(capacity&&!parts.includes(capacity))parts.push(capacity);
-  if(/SIM\s*フリー|シムフリー|SIM\s*ロック\s*(?:なし|解除済)/i.test(source))parts.push('SIMフリー');
-  if(/箱付き|箱\s*あり|充電器付き|ケーブル付き|付属品\s*(?:あり|完備)/i.test(source))parts.push('付属品あり');
-  if(parts.length)return parts.slice(0,maxParts).join('＋')+'👍';
+  const simFree=/SIM\s*フリー|シムフリー|SIM\s*ロック\s*(?:なし|解除済)/i.test(source);
+  if(capacity&&simFree){benefits.push(`${capacity}＋SIMフリーで使いやすい📱`);evidence.push(capacity,'SIMフリー');}
+  else if(capacity){benefits.push(`${capacity}で写真やアプリも保存しやすい💾`);evidence.push(capacity);}
+  else if(simFree){benefits.push('SIMフリーで回線を選びやすい📶');evidence.push('SIMフリー');}
+  if(/箱付き|箱\s*あり|充電器付き|ケーブル付き|付属品\s*(?:あり|完備)/i.test(source)){benefits.push('付属品ありも嬉しい🎁');evidence.push('付属品');}
+  if(/ネットワーク利用制限\s*(?:○|〇|マル|o)|利用制限\s*(?:○|〇)/i.test(source)){benefits.push('利用制限○も安心📶');evidence.push('利用制限○');}
+  if(/残債\s*(?:なし|無し|0)|一括購入済/i.test(source)){benefits.push('残債なしも安心🤝');evidence.push('残債なし');}
+  if(benefits.length)return {benefits,evidence};
   const excerpt=source.replace(/[。、，．！？!「」『』（）()]/g,'').trim().slice(0,12);
-  return excerpt?excerpt+'がポイント🔎':'';
+  return {benefits:excerpt?[excerpt+'に注目🔎']:[],evidence:excerpt?[excerpt]:[]};
 }
-function ranking16SpecsLabel(source,ranking){
-  const text=`${String(ranking&&ranking.model||'')} ${source}`;
-  const match=text.match(/iPhone\s*16(?:\s*(Pro\s*Max|Pro|Plus|e))?/i);
-  const variant=match&&match[1]?match[1].replace(/\s+/g,''):'';
-  if(variant==='ProMax')return {model:'16ProMax',feature:'A18Pro＋5倍望遠',required:['A18Pro','5倍望遠'],latestModel:'17ProMax',priceModel:'17PM',latestFeature:'A19Pro＋120Hz',latestRequired:['A19Pro','120Hz'],referencePrice:214800,emoji:'📸'};
-  if(variant==='Pro')return {model:'16Pro',feature:'A18Pro＋5倍望遠',required:['A18Pro','5倍望遠'],latestModel:'17Pro',priceModel:'17Pro',latestFeature:'A19Pro＋120Hz',latestRequired:['A19Pro','120Hz'],referencePrice:194800,emoji:'📸'};
-  if(variant==='Plus')return {model:'16Plus',feature:'A18＋6.7型',required:['A18','6.7型'],latestModel:'17',priceModel:'17',latestFeature:'A19＋120Hz',latestRequired:['A19','120Hz'],referencePrice:IPHONE17_NEW_REFERENCE_PRICE,emoji:'📱'};
-  if(variant==='e')return {model:'16e',feature:'A18＋48MP',required:['A18','48MP'],latestModel:'17',priceModel:'17',latestFeature:'A19＋120Hz',latestRequired:['A19','120Hz'],referencePrice:IPHONE17_NEW_REFERENCE_PRICE,emoji:'📸'};
-  return {model:'16',feature:'A18＋48MP',required:['A18','48MP'],latestModel:'17',priceModel:'17',latestFeature:'A19＋120Hz',latestRequired:['A19','120Hz'],referencePrice:IPHONE17_NEW_REFERENCE_PRICE,emoji:'📸'};
-}
-function recommendationPassesReview(text,{specs,note,price}){
+function recommendationPassesReview(text,{evidence}){
   const body=String(text||'').split('\n').slice(3).join('');
-  const hasPriceComparison=price
-    ? body.includes(compactYen(price))||body.includes(compactYen(Math.abs(specs.referencePrice-price)))
-    : body.includes(compactYen(specs.referencePrice));
   return Boolean(text)
     && text.length<=RECOMMENDATION_MAX_LENGTH
-    && body.includes(specs.latestModel)&&specs.latestRequired.every(value=>body.includes(value))
-    && body.includes(specs.model)&&specs.required.every(value=>body.includes(value))
-    && body.includes(note)&&hasPriceComparison
+    && body.includes('型落ち')&&body.includes('16')
+    && evidence.some(value=>body.includes(value))
     && !/[。、，．！？!]/.test(body)
-    && /[📱📸✨💸💰📈🔎👍]/u.test(body);
+    && /[🔋📱💾📶🎁🤝🔎💰👍]/u.test(body);
 }
 function buildRanking1Recommendation(details,ranking){
   const source=String(details||'').replace(/https?:\/\/\S+/g,'').replace(/\s+/g,' ').trim();
@@ -665,34 +659,24 @@ function buildRanking1Recommendation(details,ranking){
   const title='最新オススメランキング１位🥇';
   const heading='ここがオススメ✨';
   const prefix=[createdDate,title,heading].join('\n');
-  const price=Math.max(0,Math.round(Number(ranking&&ranking.price)||0));
-  const specs=ranking16SpecsLabel(source,ranking);
-  let priceComparison=`${specs.priceModel}新品256G${compactYen(specs.referencePrice)}💸型落ち${specs.model}がお得💰`;
-  if(price){
-    const difference=Math.abs(specs.referencePrice-price);
-    if(price<specs.referencePrice)priceComparison=`${specs.priceModel}新品256G${compactYen(specs.referencePrice)}💸1位${compactYen(price)}なら${compactYen(difference)}得💰`;
-    else if(price>specs.referencePrice)priceComparison=`${specs.priceModel}新品256G${compactYen(specs.referencePrice)}💸1位は${compactYen(difference)}高め📈`;
-    else priceComparison=`${specs.priceModel}新品256G${compactYen(specs.referencePrice)}💸1位も同価格🤝`;
+  const parsed=recommendationProductBenefits(source,ranking);
+  if(!parsed.benefits.length||!parsed.evidence.length)return '';
+  const price=Number(ranking&&ranking.price)||0,avgPrice=Number(ranking&&ranking.avgPrice)||0;
+  const savings=price&&avgPrice&&avgPrice>price?avgPrice-price:0;
+  const priceBenefit=savings?`相場より${compactYen(savings)}安い💰`:(price?`${compactYen(price)}で狙える💰`:'');
+  const closing='17にこだわらないなら型落ち16で十分👍';
+  const selected=[parsed.benefits[0]];
+  const optional=[...parsed.benefits.slice(1),priceBenefit].filter(Boolean);
+  optional.forEach(part=>{
+    const candidate=`${prefix}\n${selected.concat(part,closing).join('')}`;
+    if(candidate.length<=RECOMMENDATION_MAX_LENGTH)selected.push(part);
+  });
+  let recommendation=`${prefix}\n${selected.concat(closing).join('')}`;
+  if(!recommendationPassesReview(recommendation,{evidence:parsed.evidence})){
+    const detail=parsed.evidence[0]+'🔎';
+    recommendation=`${prefix}\n${detail}${priceBenefit}型落ち16は実用性と価格のバランスが魅力👍`;
   }
-  const featureComparison=`${specs.latestModel}は${specs.latestFeature}📱型落ち${specs.model}は${specs.feature}${specs.emoji}`;
-  let note=recommendationProductNote(source,ranking,2);
-  let recommendation=`${prefix}\n${featureComparison}${note}${priceComparison}`;
-  if(recommendation.length>RECOMMENDATION_MAX_LENGTH){
-    note=recommendationProductNote(source,ranking,1);
-    recommendation=`${prefix}\n${featureComparison}${note}${priceComparison}`;
-  }
-  if(recommendation.length>RECOMMENDATION_MAX_LENGTH){
-    const shortFeature=`${specs.latestModel}は${specs.latestFeature}📱型落ち${specs.model}は${specs.feature}${specs.emoji}`;
-    recommendation=`${prefix}\n${shortFeature}${note}${priceComparison}`;
-  }
-  if(!recommendationPassesReview(recommendation,{specs,note,price})){
-    const difference=Math.abs(specs.referencePrice-price);
-    const reviewedPrice=price
-      ? `${specs.priceModel}新品${compactYen(specs.referencePrice)}💸1位${compactYen(difference)}${price<=specs.referencePrice?'得💰':'高め📈'}`
-      : `${specs.priceModel}新品${compactYen(specs.referencePrice)}💸型落ち${specs.model}がお得💰`;
-    recommendation=`${prefix}\n${specs.latestModel}は${specs.latestFeature}📱型落ち${specs.model}は${specs.feature}${specs.emoji}${note}${reviewedPrice}`;
-  }
-  return recommendationPassesReview(recommendation,{specs,note,price})?recommendation:'';
+  return recommendationPassesReview(recommendation,{evidence:parsed.evidence})?recommendation:'';
 }
 function bindRankingRecommendationEvents(){
   const details=$('ranking1Details');

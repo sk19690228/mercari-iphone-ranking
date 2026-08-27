@@ -606,38 +606,45 @@ $('clearAmazonAffiliateBtn').addEventListener('click',()=>{
 });
 regenerateAffiliateText();
 
-function limitRecommendationBody(text,maxLength){
-  const value=String(text||'').trim();
-  if(value.length<=maxLength)return value;
-  const cut=value.slice(0,Math.max(1,maxLength-1));
-  const lastStop=Math.max(cut.lastIndexOf('。'),cut.lastIndexOf('！'),cut.lastIndexOf('!'));
-  return lastStop>=Math.floor(maxLength*.55)?cut.slice(0,lastStop+1):cut.trimEnd()+'…';
+const IPHONE17_NEW_REFERENCE_PRICE=142800;
+const RECOMMENDATION_MAX_LENGTH=120;
+function compactYen(value){
+  const amount=Math.max(0,Math.round(Number(value)||0));
+  if(amount>=10000){
+    const man=Math.floor(amount/10000),rest=amount%10000;
+    return `${man}万${rest||''}円`;
+  }
+  return `${amount}円`;
 }
-function buildRanking1Recommendation(details){
+function recommendationProductNote(source){
+  const battery=source.match(/(?:バッテリー(?:\s*最大)?\s*容量|最大\s*容量)[^\d%]{0,18}(\d{2,3})\s*%/i);
+  if(battery)return `バッテリー${Number(battery[1])}%も安心🔋`;
+  const condition=['新品、未使用','新品・未使用','未使用に近い','目立った傷や汚れなし','美品'].find(value=>source.includes(value));
+  if(condition)return `${condition.replace('新品・未使用','新品未使用')}も安心✨`;
+  if(/SIM\s*フリー|シムフリー|SIM\s*ロック\s*(?:なし|解除済)/i.test(source))return 'SIMフリーも便利📶';
+  return '';
+}
+function buildRanking1Recommendation(details,ranking){
   const source=String(details||'').replace(/https?:\/\/\S+/g,'').replace(/\s+/g,' ').trim();
   if(!source)return '';
-  const points=[];
-  const battery=source.match(/(?:バッテリー(?:\s*最大)?\s*容量|最大\s*容量)[^\d%]{0,18}(\d{2,3})\s*%/i);
-  const storage=source.match(/(?:^|\D)(16|32|64|128|256|512)\s*(?:GB|G|ギガ)(?:\D|$)/i)||source.match(/(?:^|\D)(1|2)\s*TB(?:\D|$)/i);
-  const condition=['新品、未使用','新品・未使用','未使用に近い','目立った傷や汚れなし','美品'].find(value=>source.includes(value));
-  if(condition)points.push(`「${condition.replace('新品・未使用','新品、未使用')}」なのは、中古を選ぶうえで安心材料`);
-  if(battery){const value=Number(battery[1]);points.push(`バッテリー${value}%なら、外出先でも残量を気にしすぎず使えそう`);}
-  if(storage){const capacity=/TB/i.test(storage[0])?storage[1]+'TB':storage[1]+'GB';points.push(`${capacity}なら、写真やアプリも余裕を持って保存しやすい`);}
-  if(/SIM\s*フリー|シムフリー|SIM\s*ロック\s*(?:なし|解除済)/i.test(source))points.push('SIMフリーで回線を選びやすいのも助かる');
-  if(/付属品|箱付き|ケーブル付き|充電器付き/i.test(source))points.push('付属品の記載があるのも、地味だけどうれしいポイント');
-  if(!points.length){
-    const excerpt=source.slice(0,46)+(source.length>46?'…':'');
-    points.push(`説明を読んで「${excerpt}」という部分に惹かれたのが本音`);
-  }
-  let body=`正直、${points[0]}です`;
-  if(points[1])body+=`。${points[1]}`;
-  body+='。毎日使うものだから、こういう実用面がしっかりした1台は個人的にうれしいです。';
   const createdAt=new Date();
   const createdDate=`（${createdAt.getFullYear()}年${createdAt.getMonth()+1}月${createdAt.getDate()}日）`;
   const title='最新オススメランキング１位🥇';
   const heading='ここがオススメ✨';
   const prefix=[createdDate,title,heading].join('\n');
-  return prefix+'\n'+limitRecommendationBody(body,130-prefix.length-1);
+  const price=Math.max(0,Math.round(Number(ranking&&ranking.price)||0));
+  let priceComparison=`17新品256G${compactYen(IPHONE17_NEW_REFERENCE_PRICE)}💸型落ち16がお得💰`;
+  if(price){
+    const difference=Math.abs(IPHONE17_NEW_REFERENCE_PRICE-price);
+    if(price<IPHONE17_NEW_REFERENCE_PRICE)priceComparison=`17新品256G${compactYen(IPHONE17_NEW_REFERENCE_PRICE)}💸1位${compactYen(price)}なら${compactYen(difference)}得💰`;
+    else if(price>IPHONE17_NEW_REFERENCE_PRICE)priceComparison=`17新品256G${compactYen(IPHONE17_NEW_REFERENCE_PRICE)}💸1位は${compactYen(difference)}高め📈`;
+    else priceComparison=`17新品256G${compactYen(IPHONE17_NEW_REFERENCE_PRICE)}💸1位も同価格🤝`;
+  }
+  const core=`17はA19と120Hz📱型落ち16もA18と48MP📸正直16で十分👍${priceComparison}`;
+  const note=recommendationProductNote(source);
+  let recommendation=`${prefix}\n${core}`;
+  if(note&&recommendation.length+note.length<=RECOMMENDATION_MAX_LENGTH)recommendation+=note;
+  return recommendation.slice(0,RECOMMENDATION_MAX_LENGTH);
 }
 function bindRankingRecommendationEvents(){
   const details=$('ranking1Details');
@@ -651,10 +658,10 @@ function bindRankingRecommendationEvents(){
 }
 $('generateRecommendationBtn').addEventListener('click',()=>{
   const details=$('ranking1Details'),status=$('recommendationStatus');
-  const recommendation=buildRanking1Recommendation(details?details.value:'');
+  const recommendation=buildRanking1Recommendation(details?details.value:'',getTopRankings()[0]);
   if(!recommendation){status.textContent='ランキング1位の商品詳細を入力してください';status.className='status err';if(details)details.focus();return;}
   $('recommendationText').value=recommendation;$('copyRecommendationBtn').disabled=false;
-  status.textContent=`おすすめ文を作成しました（${recommendation.length}/130文字）`;status.className='status ok';
+  status.textContent=`おすすめ文を作成しました（${recommendation.length}/${RECOMMENDATION_MAX_LENGTH}文字）`;status.className='status ok';
 });
 $('copyRecommendationBtn').addEventListener('click',()=>copyTextFrom('recommendationText','recommendationStatus'));
 

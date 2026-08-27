@@ -621,7 +621,7 @@ function recommendationProductNote(source,ranking,maxParts=2){
   const battery=source.match(/(?:バッテリー(?:\s*最大)?\s*容量|最大\s*容量)[^\d%]{0,18}(\d{2,3})\s*%/i);
   const condition=['新品、未使用','新品・未使用','未使用に近い','目立った傷や汚れなし','美品'].find(value=>source.includes(value));
   if(condition){
-    const shortCondition={'新品、未使用':'新品未使用','新品・未使用':'新品未使用','未使用に近い':'未使用級','目立った傷や汚れなし':'傷汚れ少なめ','美品':'美品'}[condition];
+    const shortCondition={'新品、未使用':'新品未使用','新品・未使用':'新品未使用','未使用に近い':'未使用級','目立った傷や汚れなし':'傷少なめ','美品':'美品'}[condition];
     parts.push(shortCondition);
   }
   if(battery)parts.push(`電池${Number(battery[1])}%`);
@@ -638,17 +638,21 @@ function ranking16SpecsLabel(source,ranking){
   const text=`${String(ranking&&ranking.model||'')} ${source}`;
   const match=text.match(/iPhone\s*16(?:\s*(Pro\s*Max|Pro|Plus|e))?/i);
   const variant=match&&match[1]?match[1].replace(/\s+/g,''):'';
-  return {model:'16'+variant,chip:/Pro/i.test(variant)?'A18 Pro':'A18'};
+  if(variant==='ProMax')return {model:'16ProMax',feature:'A18Pro＋5倍望遠',required:['A18Pro','5倍望遠'],latestModel:'17ProMax',priceModel:'17PM',latestFeature:'A19Pro＋120Hz',latestRequired:['A19Pro','120Hz'],referencePrice:214800,emoji:'📸'};
+  if(variant==='Pro')return {model:'16Pro',feature:'A18Pro＋5倍望遠',required:['A18Pro','5倍望遠'],latestModel:'17Pro',priceModel:'17Pro',latestFeature:'A19Pro＋120Hz',latestRequired:['A19Pro','120Hz'],referencePrice:194800,emoji:'📸'};
+  if(variant==='Plus')return {model:'16Plus',feature:'A18＋6.7型',required:['A18','6.7型'],latestModel:'17',priceModel:'17',latestFeature:'A19＋120Hz',latestRequired:['A19','120Hz'],referencePrice:IPHONE17_NEW_REFERENCE_PRICE,emoji:'📱'};
+  if(variant==='e')return {model:'16e',feature:'A18＋48MP',required:['A18','48MP'],latestModel:'17',priceModel:'17',latestFeature:'A19＋120Hz',latestRequired:['A19','120Hz'],referencePrice:IPHONE17_NEW_REFERENCE_PRICE,emoji:'📸'};
+  return {model:'16',feature:'A18＋48MP',required:['A18','48MP'],latestModel:'17',priceModel:'17',latestFeature:'A19＋120Hz',latestRequired:['A19','120Hz'],referencePrice:IPHONE17_NEW_REFERENCE_PRICE,emoji:'📸'};
 }
 function recommendationPassesReview(text,{specs,note,price}){
   const body=String(text||'').split('\n').slice(3).join('');
   const hasPriceComparison=price
-    ? body.includes(compactYen(price))||body.includes(compactYen(Math.abs(IPHONE17_NEW_REFERENCE_PRICE-price)))
-    : body.includes(compactYen(IPHONE17_NEW_REFERENCE_PRICE));
+    ? body.includes(compactYen(price))||body.includes(compactYen(Math.abs(specs.referencePrice-price)))
+    : body.includes(compactYen(specs.referencePrice));
   return Boolean(text)
     && text.length<=RECOMMENDATION_MAX_LENGTH
-    && body.includes('17')&&body.includes('A19')
-    && body.includes(specs.model)&&body.includes(specs.chip)
+    && body.includes(specs.latestModel)&&specs.latestRequired.every(value=>body.includes(value))
+    && body.includes(specs.model)&&specs.required.every(value=>body.includes(value))
     && body.includes(note)&&hasPriceComparison
     && !/[。、，．！？!]/.test(body)
     && /[📱📸✨💸💰📈🔎👍]/u.test(body);
@@ -662,15 +666,15 @@ function buildRanking1Recommendation(details,ranking){
   const heading='ここがオススメ✨';
   const prefix=[createdDate,title,heading].join('\n');
   const price=Math.max(0,Math.round(Number(ranking&&ranking.price)||0));
-  let priceComparison=`17新品256G${compactYen(IPHONE17_NEW_REFERENCE_PRICE)}💸型落ち16がお得💰`;
-  if(price){
-    const difference=Math.abs(IPHONE17_NEW_REFERENCE_PRICE-price);
-    if(price<IPHONE17_NEW_REFERENCE_PRICE)priceComparison=`17新品256G${compactYen(IPHONE17_NEW_REFERENCE_PRICE)}💸1位${compactYen(price)}なら${compactYen(difference)}得💰`;
-    else if(price>IPHONE17_NEW_REFERENCE_PRICE)priceComparison=`17新品256G${compactYen(IPHONE17_NEW_REFERENCE_PRICE)}💸1位は${compactYen(difference)}高め📈`;
-    else priceComparison=`17新品256G${compactYen(IPHONE17_NEW_REFERENCE_PRICE)}💸1位も同価格🤝`;
-  }
   const specs=ranking16SpecsLabel(source,ranking);
-  const featureComparison=`17はA19＋120Hz📱型落ち${specs.model}は${specs.chip}＋48MP📸`;
+  let priceComparison=`${specs.priceModel}新品256G${compactYen(specs.referencePrice)}💸型落ち${specs.model}がお得💰`;
+  if(price){
+    const difference=Math.abs(specs.referencePrice-price);
+    if(price<specs.referencePrice)priceComparison=`${specs.priceModel}新品256G${compactYen(specs.referencePrice)}💸1位${compactYen(price)}なら${compactYen(difference)}得💰`;
+    else if(price>specs.referencePrice)priceComparison=`${specs.priceModel}新品256G${compactYen(specs.referencePrice)}💸1位は${compactYen(difference)}高め📈`;
+    else priceComparison=`${specs.priceModel}新品256G${compactYen(specs.referencePrice)}💸1位も同価格🤝`;
+  }
+  const featureComparison=`${specs.latestModel}は${specs.latestFeature}📱型落ち${specs.model}は${specs.feature}${specs.emoji}`;
   let note=recommendationProductNote(source,ranking,2);
   let recommendation=`${prefix}\n${featureComparison}${note}${priceComparison}`;
   if(recommendation.length>RECOMMENDATION_MAX_LENGTH){
@@ -678,15 +682,15 @@ function buildRanking1Recommendation(details,ranking){
     recommendation=`${prefix}\n${featureComparison}${note}${priceComparison}`;
   }
   if(recommendation.length>RECOMMENDATION_MAX_LENGTH){
-    const shortFeature=`17はA19📱型落ち${specs.model}は${specs.chip}＋48MP📸`;
+    const shortFeature=`${specs.latestModel}は${specs.latestFeature}📱型落ち${specs.model}は${specs.feature}${specs.emoji}`;
     recommendation=`${prefix}\n${shortFeature}${note}${priceComparison}`;
   }
   if(!recommendationPassesReview(recommendation,{specs,note,price})){
-    const difference=Math.abs(IPHONE17_NEW_REFERENCE_PRICE-price);
+    const difference=Math.abs(specs.referencePrice-price);
     const reviewedPrice=price
-      ? `17新品${compactYen(IPHONE17_NEW_REFERENCE_PRICE)}💸1位は${compactYen(difference)}${price<=IPHONE17_NEW_REFERENCE_PRICE?'得💰':'高め📈'}`
-      : `17新品${compactYen(IPHONE17_NEW_REFERENCE_PRICE)}💸型落ち16がお得💰`;
-    recommendation=`${prefix}\n17はA19📱型落ち${specs.model}は${specs.chip}＋48MP📸${note}${reviewedPrice}`;
+      ? `${specs.priceModel}新品${compactYen(specs.referencePrice)}💸1位${compactYen(difference)}${price<=specs.referencePrice?'得💰':'高め📈'}`
+      : `${specs.priceModel}新品${compactYen(specs.referencePrice)}💸型落ち${specs.model}がお得💰`;
+    recommendation=`${prefix}\n${specs.latestModel}は${specs.latestFeature}📱型落ち${specs.model}は${specs.feature}${specs.emoji}${note}${reviewedPrice}`;
   }
   return recommendationPassesReview(recommendation,{specs,note,price})?recommendation:'';
 }

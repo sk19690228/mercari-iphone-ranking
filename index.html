@@ -545,6 +545,7 @@ Object.keys(rankingDrafts).forEach(url=>{
 localStorage.setItem('mercariRankingDraftsV1',JSON.stringify(rankingDrafts));
 const RANK_MEDALS=['🥇','🥈','🥉'];
 const RANK_NUMBERS=['①','②','③'];
+const RANK_ORDINALS=['第１位','第２位','第３位'];
 const MERCARI_AFFILIATE_ID='9289281257';
 function buildMercariAffiliateUrl(pageUrl){
   try{
@@ -585,9 +586,9 @@ function buildAffiliateText(){
   const blocks=ranked.map((c,i)=>{
     const draft=rankingDraft(c);
     const affiliate=draft.affiliateUrl.trim()||'(メルカリアフィリエイトリンク未入力)';
-    return `🉐ランキング${RANK_NUMBERS[i]}${RANK_MEDALS[i]}\n${rankingPriceLine(c)}\n👉  ${affiliate}`;
+    return `${RANK_MEDALS[i]}${RANK_ORDINALS[i]}\n${rankingPriceLine(c)}\n${affiliate}`;
   });
-  return `✨メルカリ✨おすすめiPhone🤓👍\n${blocks.length?'\n'+blocks.join('\n\n')+'\n':''}[PR] mercari ambassador`;
+  return `🉐おすすめランキング🤓👍\n${blocks.length?'\n'+blocks.join('\n\n')+'\n':''}[PR] mercari ambassador`;
 }
 function regenerateAffiliateText(){ $('affiliateText').value = buildAffiliateText(); }
 function saveAffiliateLinks(){

@@ -10,7 +10,7 @@
 
 var AVG_PRICES_KEY = 'AVG_PRICES_V1';
 var AVG_PRICES_UPDATED_AT_KEY = 'AVG_PRICES_UPDATED_AT_V1';
-var CODE_VERSION = 'ranking-4';
+var CODE_VERSION = 'ranking-5';
 var USER_AGENT = 'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 Chrome/126 Mobile Safari/537.36';
 var LIST_PAGE_USER_AGENTS = [
   'Googlebot/2.1 (+http://www.google.com/bot.html)',
@@ -100,6 +100,7 @@ function searchListPage_(p) {
   var targetUrls = directItemUrls.slice(0, maxItems);
   var responses = fetchAllSafe_(targetUrls);
   var items = [];
+  var auctionExcluded = 0;
   responses.forEach(function(entry, index) {
     var url = targetUrls[index];
     if (!entry.ok) {
@@ -108,6 +109,12 @@ function searchListPage_(p) {
     }
     var item = parseMercariItem_(entry.text, url, null);
     if (!item || !item.url) return;
+    // オークション商品はブラウザへ返す前に検索結果から除外する。
+    // フロント側にも判定を残し、古いGASや保存済み候補に対する安全網とする。
+    if (item.isAuction === true) {
+      auctionExcluded++;
+      return;
+    }
     items.push(item);
   });
   return {
@@ -117,6 +124,7 @@ function searchListPage_(p) {
     listPageFetched: listPageFetched,
     listItemsFound: directItemUrls.length,
     foundUrls: targetUrls.length,
+    auctionExcluded: auctionExcluded,
     remainingDueToLimit: directItemUrls.length > maxItems,
     warnings: unique_(warnings).slice(0, 12),
     elapsedMs: Date.now() - started,
@@ -324,7 +332,10 @@ function detectAuctionListing_(value) {
   var text = String(value || '');
   if (/"(?:saleType|listingType|itemType)"\s*:\s*"?(?:AUCTION|BIDDING)"?|"isAuction"\s*:\s*true/i.test(text)) return true;
   if (/オークションではありません|オークションではない/i.test(text)) return false;
-  return /オークション商品|オークション形式|入札する|現在価格|落札価格/i.test(text);
+  // 実際の出品ページでは「現在 ¥99,999」のように「価格」を挟まず表示される。
+  // 説明文に「オークション入札」という語があるだけの通常出品を誤除外しないよう、
+  // 単独の「入札」ではなく価格・操作・履歴などの固有表示で判定する。
+  return /オークション商品|オークション形式|入札する|入札履歴|入札件数|入札金額|最高入札|開始価格|終了日時|オークション終了|現在価格|落札価格|現在\s*[¥￥]\s*[\d,]+/i.test(text);
 }
 
 function buildItem_(url, title, description, image, price, context, isAuction) {

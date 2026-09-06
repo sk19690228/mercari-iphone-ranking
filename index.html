@@ -559,7 +559,7 @@ function detectAuctionListing(value){
   const text=String(value||'');
   if(/"(?:saleType|listingType|itemType)"\s*:\s*"?(?:AUCTION|BIDDING)"?|"isAuction"\s*:\s*true/i.test(text))return true;
   if(/オークションではありません|オークションではない/i.test(text))return false;
-  return /オークション商品|オークション形式|入札する|現在価格|落札価格/i.test(text);
+  return /オークション商品|オークション形式|入札する|入札履歴|入札件数|入札金額|最高入札|開始価格|終了日時|オークション終了|現在価格|落札価格|現在\s*[¥￥]\s*[\d,]+/i.test(text);
 }
 function isAuctionCandidate(candidate){
   if(!candidate)return false;
@@ -1307,6 +1307,7 @@ async function runBulkSearch({automatic=false}={}){
     log(result.sourceType==='item'?'商品ページを直接取得':'商品一覧ページ取得: 成功');
     log(`一覧から商品検出: ${result.listItemsFound||0}件`);
     log(`処理対象の商品URL: ${result.foundUrls||0}件`);
+    if(Number(result.auctionExcluded||0)>0) log(`オークション除外: ${result.auctionExcluded}件`);
     let added=0,rejected=0;
     items.forEach(raw=>{
       const c=parseCandidateFromPage(raw);

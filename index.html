@@ -555,9 +555,22 @@ function buildMercariAffiliateUrl(pageUrl){
     return url.toString();
   }catch(e){return '';}
 }
+function detectAuctionListing(value){
+  const text=String(value||'');
+  if(/"(?:saleType|listingType|itemType)"\s*:\s*"?(?:AUCTION|BIDDING)"?|"isAuction"\s*:\s*true/i.test(text))return true;
+  if(/オークションではありません|オークションではない/i.test(text))return false;
+  return /オークション商品|オークション形式|入札する|現在価格|落札価格/i.test(text);
+}
+function isAuctionCandidate(candidate){
+  if(!candidate)return false;
+  if(candidate.isAuction===true)return true;
+  const text=[candidate.title,candidate.description,candidate.sourceSubject,(candidate.riskFlags||[]).join(' ')].join(' ');
+  return detectAuctionListing(text)||/(?:^|\s)オークション(?:\s|$)/i.test(text);
+}
 function discountSortValue(c){ return c&&c.discountRate!==null&&c.discountRate!==undefined&&Number.isFinite(Number(c.discountRate)) ? Number(c.discountRate) : -Infinity; }
 function getTopRankings(){
   return candidates
+    .filter(c=>!isAuctionCandidate(c))
     .filter(c=>!$('excludeAboveAvg').checked||!c.avgPrice||!c.price||c.price<=c.avgPrice)
     .slice()
     .sort((a,b)=>discountSortValue(b)-discountSortValue(a))
@@ -1008,12 +1021,14 @@ function parseMercariHtml(html, url){
   const price = Number((priceMeta || (priceMatch ? priceMatch[1] : '')).replace(/[^\d]/g,'')) || 0;
   const avgPrice = PRICE_TABLE[model+'|'+storage] || null;
   const riskFlags = RISK_PATTERNS.filter(w => fullText.includes(w));
+  const isAuction=detectAuctionListing(fullText+' '+normalizedHtml);
   const discountYen = avgPrice && price ? avgPrice-price : null;
   const discountRate = avgPrice && price ? (discountYen/avgPrice*100) : null;
-  return {url,title,description:mainSection,image:images[0]||image,images,model,storage,color,condition,battery,price,avgPrice,discountYen,discountRate,riskFlags,addedAt:Date.now()};
+  return {url,title,description:mainSection,image:images[0]||image,images,model,storage,color,condition,battery,price,avgPrice,discountYen,discountRate,riskFlags,isAuction,addedAt:Date.now()};
 }
 
 function candidateScore(c){
+  if(isAuctionCandidate(c)) return -1000;
   if(!c.avgPrice || !c.price || !c.model.startsWith('iPhone 16')) return -999;
   if($('excludeAboveAvg').checked&&c.price>c.avgPrice) return -700;
   if($('excludeRisk').checked && (c.riskFlags||[]).length) return -500;
@@ -1191,6 +1206,7 @@ function parseCandidateFromPage(raw){
   const bm=text.match(/(?:バッテリー(?:\s*最大)?\s*容量|最大\s*容量)[^\d%]{0,18}(\d{2,3})\s*%/i);
   const battery=bm?Number(bm[1]):null;
   const riskFlags=RISK_PATTERNS.filter(w=>text.includes(w));
+  const isAuction=pick(raw,['isAuction'],false)===true||detectAuctionListing(text+' '+JSON.stringify(raw));
   const simFree=triState(text,/SIM\s*フリー|シムフリー|SIM\s*ロック\s*(?:なし|解除済)/i,/SIM\s*ロック\s*(?:あり|未解除)/i);
   const shippingIncluded=triState(text,/送料込み|出品者負担/i,/着払い|購入者負担/i);
   const functionalIssue=/機能不良[^な]{0,8}(?:あり|有)|動作不良|故障|電源が入らない/i.test(text);
@@ -1200,7 +1216,7 @@ function parseCandidateFromPage(raw){
   const discountRate=avgPrice&&price?discountYen/avgPrice*100:null;
   return {
     url,title,description:String(pick(raw,['bodyText','description','context'],'')),image,model,storage,color,condition,battery,price,avgPrice,discountYen,discountRate,
-    riskFlags,simFree,shippingIncluded,functionalIssue,
+    riskFlags,isAuction,simFree,shippingIncluded,functionalIssue,
     sourceSubject:String(pick(raw,['sourceSubject'],'')),
     sourceDate:String(pick(raw,['sourceDate'],'')),
     detailFetched:pick(raw,['detailFetched'],false)===true,
@@ -1210,6 +1226,7 @@ function parseCandidateFromPage(raw){
 function evaluatePageCandidate(c){
   const reasons=[];
   const trust=$('trustSavedSearch').checked;
+  if(isAuctionCandidate(c)) reasons.push('オークション商品');
   if(!c.url) reasons.push('商品URLなし');
   if(!c.model.startsWith('iPhone 16')) reasons.push('iPhone 16シリーズとして判定できず');
   if(!c.storage) reasons.push('容量を判定できず');
@@ -1462,7 +1479,9 @@ $('downloadRankingBtn').addEventListener('click',async()=>{
 
 function renderCandidates(){
   const list=$('candidateList');
-  const visibleCandidates=candidates.filter(c=>!$('excludeAboveAvg').checked||!c.avgPrice||!c.price||c.price<=c.avgPrice);
+  const visibleCandidates=candidates
+    .filter(c=>!isAuctionCandidate(c))
+    .filter(c=>!$('excludeAboveAvg').checked||!c.avgPrice||!c.price||c.price<=c.avgPrice);
   if(!visibleCandidates.length){ list.innerHTML='<div class="emptyBox">新着商品を検索しています。<br>検索後、条件に合う候補がここへ表示されます。</div>';renderRankingEditor();return; }
   const ranked=[...visibleCandidates].sort((a,b)=>discountSortValue(b)-discountSortValue(a));
   list.innerHTML=ranked.map((c,i)=>{

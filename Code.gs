@@ -10,7 +10,7 @@
 
 var AVG_PRICES_KEY = 'AVG_PRICES_V1';
 var AVG_PRICES_UPDATED_AT_KEY = 'AVG_PRICES_UPDATED_AT_V1';
-var CODE_VERSION = 'ranking-3';
+var CODE_VERSION = 'ranking-4';
 var USER_AGENT = 'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 Chrome/126 Mobile Safari/537.36';
 var LIST_PAGE_USER_AGENTS = [
   'Googlebot/2.1 (+http://www.google.com/bot.html)',
@@ -309,7 +309,7 @@ function parseMercariItem_(html, url, context) {
   var contextText = context ? (context.subject + '\n' + context.plain + '\n' + stripTags_(context.html)) : '';
   if (!price) price = extractPrice_(contextText);
   if (!description && contextText) description = contextText;
-  return buildItem_(url, title, description, image, price, context);
+  return buildItem_(url, title, description, image, price, context, detectAuctionListing_(html + '\n' + contextText));
 }
 
 function parseMailFallback_(url, context) {
@@ -317,10 +317,17 @@ function parseMailFallback_(url, context) {
   var text = context.subject + '\n' + context.plain + '\n' + stripTags_(context.html);
   var title = extractNearbyTitle_(context.html, url) || context.subject;
   var image = extractNearbyImage_(context.html, url);
-  return buildItem_(url, title, text, image, extractPrice_(text), context);
+  return buildItem_(url, title, text, image, extractPrice_(text), context, detectAuctionListing_(text));
 }
 
-function buildItem_(url, title, description, image, price, context) {
+function detectAuctionListing_(value) {
+  var text = String(value || '');
+  if (/"(?:saleType|listingType|itemType)"\s*:\s*"?(?:AUCTION|BIDDING)"?|"isAuction"\s*:\s*true/i.test(text)) return true;
+  if (/オークションではありません|オークションではない/i.test(text)) return false;
+  return /オークション商品|オークション形式|入札する|現在価格|落札価格/i.test(text);
+}
+
+function buildItem_(url, title, description, image, price, context, isAuction) {
   var cleanDescription = sanitizeDescription_(description);
   var combined = [title, cleanDescription, context ? context.subject : ''].join(' ');
   return {
@@ -335,6 +342,7 @@ function buildItem_(url, title, description, image, price, context) {
     storage: detectStorage_(combined),
     color: detectColor_(combined),
     condition: detectCondition_(combined),
+    isAuction: isAuction === true,
     sourceSubject: context ? context.subject : '',
     sourceDate: context && context.date ? context.date.toISOString() : '',
     detailFetched: !!description

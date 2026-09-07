@@ -107,7 +107,7 @@
         <div><label>取得する最大商品数</label><input type="number" id="mailMaxItems" value="40" min="1" max="100"></div>
         <div><label>最低バッテリー（記載時）</label><input type="number" id="searchMinBattery" value="80" min="0" max="100"></div>
       </div>
-      <label><input type="checkbox" id="excludeAboveAvg" checked> 中古平均価格と比較して高い商品は除外</label>
+      <label><input type="checkbox" id="excludeAboveAvg" checked> 中古平均価格以下を優先（3件未満の場合は価格差が小さい商品で補完）</label>
       <label><input type="checkbox" id="trustSavedSearch" checked> URL元の検索条件を信頼し、商品ページで確認できない項目は除外しない</label>
       <label><input type="checkbox" id="searchSimFree" checked> SIMロックありと明記された商品を除外</label>
       <label><input type="checkbox" id="excludeRisk" checked> ジャンク・空箱・部品取り等を除外</label>
@@ -569,12 +569,15 @@ function isAuctionCandidate(candidate){
 }
 function discountSortValue(c){ return c&&c.discountRate!==null&&c.discountRate!==undefined&&Number.isFinite(Number(c.discountRate)) ? Number(c.discountRate) : -Infinity; }
 function getTopRankings(){
-  return candidates
+  const safe=candidates
     .filter(c=>!isAuctionCandidate(c))
-    .filter(c=>!$('excludeAboveAvg').checked||!c.avgPrice||!c.price||c.price<=c.avgPrice)
     .slice()
-    .sort((a,b)=>discountSortValue(b)-discountSortValue(a))
-    .slice(0,3);
+    .sort((a,b)=>discountSortValue(b)-discountSortValue(a));
+  if(!$('excludeAboveAvg').checked)return safe.slice(0,3);
+  const preferred=safe.filter(c=>!c.avgPrice||!c.price||c.price<=c.avgPrice);
+  if(preferred.length>=3)return preferred.slice(0,3);
+  const fallback=safe.filter(c=>c.avgPrice&&c.price&&c.price>c.avgPrice);
+  return preferred.concat(fallback).slice(0,3);
 }
 function rankingDraft(c){
   const saved=rankingDrafts[c.url]||{};
@@ -1231,7 +1234,8 @@ function evaluatePageCandidate(c){
   if(!c.model.startsWith('iPhone 16')) reasons.push('iPhone 16シリーズとして判定できず');
   if(!c.storage) reasons.push('容量を判定できず');
   if(!c.price) reasons.push('価格を取得できず');
-  if($('excludeAboveAvg').checked&&c.avgPrice&&c.price>c.avgPrice) reasons.push('中古平均価格より高い');
+  // 平均価格より高い商品も安全条件を満たせば候補として保持する。
+  // ランキングでは平均価格以下を優先し、3件未満のときだけ補完に使う。
   if($('excludeRisk').checked&&(c.riskFlags||[]).length) reasons.push('注意語句: '+c.riskFlags.join('・'));
   if(c.functionalIssue) reasons.push('機能不良の記載あり');
   if($('searchSimFree').checked){
@@ -1482,7 +1486,7 @@ function renderCandidates(){
   const list=$('candidateList');
   const visibleCandidates=candidates
     .filter(c=>!isAuctionCandidate(c))
-    .filter(c=>!$('excludeAboveAvg').checked||!c.avgPrice||!c.price||c.price<=c.avgPrice);
+    .slice();
   if(!visibleCandidates.length){ list.innerHTML='<div class="emptyBox">新着商品を検索しています。<br>検索後、条件に合う候補がここへ表示されます。</div>';renderRankingEditor();return; }
   const ranked=[...visibleCandidates].sort((a,b)=>discountSortValue(b)-discountSortValue(a));
   list.innerHTML=ranked.map((c,i)=>{

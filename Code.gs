@@ -10,7 +10,7 @@
 
 var AVG_PRICES_KEY = 'AVG_PRICES_V1';
 var AVG_PRICES_UPDATED_AT_KEY = 'AVG_PRICES_UPDATED_AT_V1';
-var CODE_VERSION = 'ranking-5';
+var CODE_VERSION = 'ranking-6';
 var USER_AGENT = 'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 Chrome/126 Mobile Safari/537.36';
 var LIST_PAGE_USER_AGENTS = [
   'Googlebot/2.1 (+http://www.google.com/bot.html)',
@@ -97,7 +97,10 @@ function searchListPage_(p) {
   }
   directItemUrls = unique_(directItemUrls);
   if (!directItemUrls.length) throw new Error('固定検索ページから商品リンクを検出できませんでした');
-  var targetUrls = directItemUrls.slice(0, maxItems);
+  // maxItemsは「調査件数」ではなく「通常販売商品の返却上限」として扱う。
+  // 途中にオークションが混ざっていても次の商品で補充できるよう、
+  // 一覧で見つかったURLを最大100件まで確認する。
+  var targetUrls = directItemUrls.slice(0, 100);
   var responses = fetchAllSafe_(targetUrls);
   var items = [];
   var auctionExcluded = 0;
@@ -115,7 +118,7 @@ function searchListPage_(p) {
       auctionExcluded++;
       return;
     }
-    items.push(item);
+    if (items.length < maxItems) items.push(item);
   });
   return {
     items: items,
@@ -125,7 +128,7 @@ function searchListPage_(p) {
     listItemsFound: directItemUrls.length,
     foundUrls: targetUrls.length,
     auctionExcluded: auctionExcluded,
-    remainingDueToLimit: directItemUrls.length > maxItems,
+    remainingDueToLimit: directItemUrls.length > targetUrls.length,
     warnings: unique_(warnings).slice(0, 12),
     elapsedMs: Date.now() - started,
     checkedAt: new Date().toISOString()

@@ -73,6 +73,10 @@
   details.settings{margin-top:10px;} details.settings summary{font-size:12px;font-weight:700;cursor:pointer;color:var(--accent);}
   .bulkControls{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;}
   .progressBox{margin-top:10px;padding:10px;border-radius:10px;background:var(--panel2);font-size:11px;line-height:1.65;white-space:pre-wrap;max-height:220px;overflow:auto;}
+  .searchResultUrls{display:grid;gap:8px;margin-top:12px;}
+  .searchResultUrl{display:block;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--panel2);color:var(--text);text-decoration:none;overflow-wrap:anywhere;}
+  .searchResultUrl b{display:block;color:var(--accent);font-size:12px;margin-bottom:3px;}
+  .searchResultUrl span{display:block;font-size:11px;line-height:1.5;}
   .apiRequired{border-left:4px solid var(--warn);padding-left:10px;}
   .detailsAction{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start;}
   .detailsAction textarea{min-height:120px;}
@@ -123,6 +127,7 @@
     <button class="btn-primary" id="bulkSearchBtn">新着商品を再検索・おすすめ決定</button>
     <div class="status" id="bulkStatus"></div>
     <div class="progressBox" id="bulkProgress" style="display:none" hidden></div>
+    <div id="searchResultUrls" class="searchResultUrls"></div>
     <div class="status" id="shareStatus" style="display:none"></div>
   </div>
 
@@ -1501,6 +1506,10 @@ function renderCandidates(){
   const visibleCandidates=candidates
     .filter(c=>!isAuctionCandidate(c))
     .slice();
+  const resultUrls=$('searchResultUrls');
+  resultUrls.innerHTML=visibleCandidates.length
+    ?visibleCandidates.map((c,i)=>`<a class="searchResultUrl" href="${esc(c.url)}" target="_blank" rel="noopener"><b>検索結果 ${i+1}：${esc(c.title||'商品タイトル不明')}</b><span>${c.price?yen(c.price):'価格不明'}</span><span>${esc(c.url)}</span></a>`).join('')
+    :'';
   if(!visibleCandidates.length){ list.innerHTML='<div class="emptyBox">新着商品を検索しています。<br>検索後、条件に合う候補がここへ表示されます。</div>';renderRankingEditor();return; }
   const ranked=[...visibleCandidates].sort((a,b)=>discountSortValue(b)-discountSortValue(a));
   list.innerHTML=ranked.map((c,i)=>{
